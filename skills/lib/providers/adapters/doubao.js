@@ -1,6 +1,11 @@
 /**
  * Doubao (豆包) provider adapter config.
  *
+ * Phase 2: first NATIVE interface adapter — imports shared patterns directly
+ * from bridge/overlays (not the providerFactory shim) and carries only data
+ * fields. All behavioral steps (prepare/findEditor/input/send/extract) fall
+ * through to the runner's bridge-helper defaults. No hooks, no overrides.
+ *
  * ByteDance's AI chatbot at doubao.com.
  * Uses a React SPA with CSS modules (Semi Design / custom design system).
  *
@@ -13,7 +18,7 @@
  *     - Both have data-streaming="false" when complete
  */
 
-const { COMMON_DISMISS_PATTERNS } = require('../../providerFactory');
+const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
 
 const RESPONSE_SELECTORS = [
     // v1: message-list → md-box-root is the semantic content container.

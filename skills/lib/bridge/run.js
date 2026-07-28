@@ -3,11 +3,15 @@
  *
  * Extracted from providerFactory.js (Phase 1). Thin 10-step flow skeleton:
  * navigate → auth → quota → overlays → prepare → findEditor → input → send
- * → waitForCompletion → extract → onComplete. Each step reads from the adapter
- * config (selectors/patterns/hooks) — DOM specifics stay in the adapter, not here.
+ * → waitForCompletion → extract → onComplete. Each step delegates to the
+ * adapter's named method when present, falling back to bridge helpers
+ * (findEditableElement / defaultInput / clickSend / extractResponse) when
+ * absent. DOM specifics live in the adapter; this skeleton stays DOM-free.
  *
- * Phase 1: behavior-equivalent extraction. The config-schema + hook model is
- * unchanged; Phase 2 will replace it with a named-method adapter interface.
+ * Phase 2: createProviderRunner now normalizes its input via toAdapter()
+ * (contract.js) — legacy configs are lifted by wrapConfig, native interface
+ * modules are validated by assertAdapter. The 4 behavioral steps (prepare /
+ * findEditor / input / send) dispatch on the interface methods.
  */
 'use strict';
 
@@ -19,6 +23,7 @@ const { defaultInput, INSERT_TEXT_LIMIT, findEditableElement, clearEditor, click
 const { waitForCompletion } = require('./completion');
 const { checkOverlays } = require('./overlays');
 const { extractResponse } = require('./extract');
+const { toAdapter } = require('./contract');
 
 const flog = (key, msg) => { try { _tlog(key || 'factory', msg); } catch (_) {} };
 
@@ -70,8 +75,12 @@ DEFAULTS.input = defaultInput;
  * @returns {(page: Page, prompt: string, timeoutMs: number, ctx: object) => Promise<{success: boolean, response?: string, reason?: string}>}
  */
 function createProviderRunner(cfg) {
-    // Merge defaults
-    const C = { ...DEFAULTS, ...cfg };
+    // Merge defaults, then normalize to the Adapter interface (Phase 2):
+    // legacy configs (with preInputHook/customSend) are lifted by wrapConfig;
+    // native interface modules are validated by assertAdapter. Either way `C`
+    // carries the named methods the steps below dispatch on (prepare/input/send/
+    // findEditor), with defaults applied inline when a method is absent.
+    const C = toAdapter({ ...DEFAULTS, ...cfg });
 
     return async function run(page, prompt, timeoutMs, ctx) {
         const provStart = Date.now();
@@ -196,9 +205,9 @@ function createProviderRunner(cfg) {
         }
 
         // ── Step 4: Pre-input hook (e.g. Gemini Pro detection) ──
-        if (C.preInputHook) {
+        if (C.prepare) {
             try {
-                await C.preInputHook(page, C);
+                await C.prepare(page);
             } catch (e) {
                 return classifyError(e, STAGES.PRE_EDITOR, C.key);
             }
@@ -207,9 +216,11 @@ function createProviderRunner(cfg) {
         // ── Step 5: Find editor ──
         // v10: findEditableElement now self-heals (heuristic rescue) and dumps
         // diagnostics on total failure — pass the provider-tagged logger.
-        const editor = await findEditableElement(
-            page, C.editorSelectors, C.validateEditor, (m) => flog(C.key, m)
-        );
+        // Phase 2: adapter may override findEditor(); default uses its
+        // editorSelectors + validateEditor data fields.
+        const editor = C.findEditor
+            ? await C.findEditor(page)
+            : await findEditableElement(page, C.editorSelectors, C.validateEditor, (m) => flog(C.key, m));
         if (!editor) {
             return classifyError(
                 new Error('No editable input found'),
@@ -222,7 +233,7 @@ function createProviderRunner(cfg) {
         // skewing telemetry-based failure analysis.
         try {
             await clearEditor(page, editor);
-            const inputOk = await C.input(page, editor, prompt, { timeoutMs });
+            const inputOk = await (C.input || defaultInput)(page, editor, prompt, { timeoutMs });
             if (!inputOk) {
                 return classifyError(
                     new Error('Failed to input text'),
@@ -247,8 +258,8 @@ function createProviderRunner(cfg) {
 
         // ── Step 7: Send ── (stage label fixed: was mislabeled WAIT_RESPONSE)
         try {
-            if (C.customSend) {
-                await C.customSend(page, editor);
+            if (C.send) {
+                await C.send(page, editor);
             } else {
                 await clickSend(page, editor, C.sendSelectors, C.sendFallback);
             }
