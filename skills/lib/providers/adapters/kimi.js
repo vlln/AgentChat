@@ -11,8 +11,12 @@
  *     stop-control + spinner DOM signals, bounded by stillGeneratingMaxHoldMs
  */
 
-const { COMMON_DISMISS_PATTERNS } = require('../../providerFactory');
+const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
 const { makeStillWorkingCheck } = require('../../stillWorking');
+
+// Phase 2: native interface adapter. prepare/send are named methods (were
+// preInputHook/customSend); stillGeneratingCheck + postResponseHook stay data
+// fields read by completion/extract defaults.
 
 // Hoisted so responseSelectors and stillGeneratingCheck are guaranteed to
 // judge the SAME container family. The old check hardcoded selector [0]
@@ -50,8 +54,8 @@ module.exports = {
     ],
     dismissPatterns: [...COMMON_DISMISS_PATTERNS, /版本.*更新/i],
 
-    // ── Start fresh conversation to avoid stale DOM from previous chats ──
-    preInputHook: async (page) => {
+    // ── prepare: start fresh conversation to avoid stale DOM from previous chats ──
+    prepare: async (page) => {
         try {
             const clicked = await page.evaluate(() => {
                 let btn = document.querySelector('.new-chat-btn');
@@ -77,8 +81,8 @@ module.exports = {
         '[role="textbox"]',
     ],
 
-    // ── Kimi's send button loses "disabled" class when text is entered ──
-    customSend: async (page) => {
+    // ── send: Kimi's send button loses "disabled" class when text is entered ──
+    send: async (page, _editor) => {
         const sendBtn = page.locator('.send-button-container').first();
         await page.waitForTimeout(800);
         // BUGFIX: catch default was inverted. If the button doesn't exist,

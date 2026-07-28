@@ -7,8 +7,12 @@
  *   - customSend overrides the factory's default clickSend
  */
 
-const { COMMON_CN_QUOTA_PATTERNS, COMMON_DISMISS_PATTERNS } = require('../../providerFactory');
+const { COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/run');
+const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
 const { makeStillWorkingCheck } = require('../../stillWorking');
+
+// Phase 2: native interface adapter. send is a named method (was customSend);
+// stillGeneratingCheck stays a data field read by completion's default.
 
 // Hoisted so the still-working probe judges the same container family the
 // factory polls (see kimi.js v11 note).
@@ -48,10 +52,10 @@ module.exports = {
         '[contenteditable="true"]',
         '[role="textbox"]',
     ],
-    // MiMo's send button is found via DOM traversal from textarea, not CSS selectors.
+    // ── send: DOM-traversal send button (MiMo has no stable CSS selector) ──
     // Tries both editorSelectors placeholder variants — the textarea that actually
     // matched during Step 5 (Chinese or English UI) may be either one.
-    customSend: async (page, _editor) => {
+    send: async (page, _editor) => {
         let sent = false;
         for (const textareaSel of [
             'textarea[placeholder*="有问题，尽管问"]',

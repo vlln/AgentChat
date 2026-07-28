@@ -16,7 +16,11 @@
  *   - FIX: changed textarea selector to 'textarea:not(.wcDTda_fallbackTextarea)'
  */
 
-const { inputViaClipboard, inputViaSimulatedPaste, inputViaKeyboard, COMMON_DISMISS_PATTERNS } = require('../../providerFactory');
+const { inputViaClipboard, inputViaSimulatedPaste, inputViaKeyboard } = require('../../bridge/dom');
+const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
+
+// Phase 2: native interface adapter. prepare/input are named methods;
+// validateEditor stays a data field read by the runner's default findEditor.
 
 module.exports = {
     key: 'chatgpt',
@@ -80,10 +84,10 @@ module.exports = {
     responseFormat: 'markdown',
     minResponseLength: 5,
 
-    // ── Pre-input hook: wait for ProseMirror editor to be ready ──
+    // ── prepare: wait for ProseMirror editor to be ready ──
     // The navPostDelay handles the common case, but this is the safety net
     // for slow network / server-rendered pages that take longer to hydrate.
-    preInputHook: async (page, C) => {
+    prepare: async (page) => {
         // Wait for the ProseMirror editor div to be visible and interactive
         // (not the hidden fallback textarea that exists in initial HTML)
         try {

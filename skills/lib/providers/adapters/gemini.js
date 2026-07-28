@@ -211,9 +211,11 @@ module.exports = {
         /已達到.*(?:上限|限額|限制)/i,
     ],
 
-    // ── Pre-input: tiered model activation (Pro Extended → Flash → fail) ──
-    preInputHook: async (page, cfg, logFn) => {
-        const log = logFn || glog;
+    // ── prepare: tiered model activation (Pro Extended → Flash → lenient) ──
+    // Phase 2: was preInputHook(page, cfg, logFn). cfg was unused (policy comes
+    // from process.env); logFn defaulted to the module's glog anyway.
+    prepare: async (page) => {
+        const log = glog;
         // Per-run reset: _preGenStreak is module-level state. In a long-lived
         // process that runs this adapter more than once (tests, future daemon
         // mode), a streak left at MAX from the previous run would make
