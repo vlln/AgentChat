@@ -114,3 +114,35 @@ multiple composable consumers. The current code has none pending, so we stop.
   and `still_working` (completion phases + login-regex source scan).
 - `node skills/AgentChat-WebExtended/index.js --doctor` — CDP reachability.
 - `node skills/AgentChat-WebExtended/index.js --smoke` — all providers.
+
+## Provider quirks (developer reference)
+
+Each adapter (`lib/providers/adapters/<name>.js`) owns its DOM coupling. The
+non-obvious differences, for maintenance reference:
+
+| Provider | Key difference |
+|----------|----------------|
+| Gemini | Pro Extended activation, bursty-output detection, 120s stop-btn extension, Action Toolbar completion anchor, dual-draft panel resolution |
+| ChatGPT | 3-tier input (clipboard→simulated paste→keyboard), React send-button state verification, hidden fallback-textarea rejection |
+| Claude | ProseMirror editor, "Thinking" placeholder filter, embedded search-block strip |
+| Qwen | React SPA 3s delay, stop-btn detached mode (removed from DOM when done, not hidden), model-name prefix strip |
+| Kimi | new-session per call, send-button-container disabled-class detection, adaptive stability window (tool-phase truncation fix) |
+| MiniMax | TipTap/ProseMirror async mount 4s delay, `aria-label="发送消息"` non-button send element |
+| MiMo | React SPA 4s delay, DOM-traversal send button (no stable CSS selector) |
+| DeepSeek | standard pipeline, ds-markdown response |
+| Doubao | React SPA 4s delay, Semi Design textarea, `#flow-end-msg-send` send button |
+
+## Adding a provider
+
+1. Create `lib/providers/adapters/<name>.js` exporting the Adapter interface:
+   required data (`key`, `url`, `authDomains`, `editorSelectors`,
+   `responseSelectors`) + optional methods (`prepare`/`findEditor`/`input`/
+   `send`) overriding bridge-helper defaults. Add `validateEditor` /
+   `postResponseHook` / `stillGeneratingCheck` as data hooks if needed.
+2. Add the entry to `PROVIDER_CHAIN` in `lib/providers/chain.js` (key, name,
+   url, authDomains, optional `recoveryHint` / `tabHosts`).
+3. Add the key to `PROVIDER_KEYS` in `skills/AgentChat-WebExtended/index.js`
+   (auto-registers a runner via `createProviderRunner`).
+4. Validate: `assertAdapter` fails fast at load if required fields are missing;
+   `npm test` covers shared patterns; `--only=<name> --single` exercises the
+   dispatch path against a live Chrome.

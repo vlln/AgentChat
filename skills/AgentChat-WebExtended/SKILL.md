@@ -1,6 +1,18 @@
 ---
 name: AgentChat-WebExtended
-description: Multi-provider CDP bridge with automatic fallback (Gemini→ChatGPT→Claude→Qwen→Kimi→MiniMax→MiMo→DeepSeek→Doubao). Use for AI provider failover, fallback chain, multi-provider routing, or "send to any available AI". A run is proven by its `[receipt] AGENTCHAT_RUN` line on stderr — no receipt means no run happened.
+description: >-
+  Multi-provider CDP bridge with automatic fallback
+  (Gemini→ChatGPT→Claude→Qwen→Kimi→MiniMax→MiMo→DeepSeek→Doubao). Use for AI
+  provider failover, fallback chain, multi-provider routing, or "send to any
+  available AI". A run is proven by its `[receipt] AGENTCHAT_RUN` line on stderr
+  — no receipt means no run happened.
+license: MIT
+metadata:
+  author: vlln
+  version: "0.1.0"
+requires:
+  bins:
+    - node
 ---
 
 # AgentChat-WebExtended — Multi-Provider CDP Bridge
@@ -10,10 +22,10 @@ MiniMax → MiMo → DeepSeek → Doubao. First available provider wins; each st
 falls through only on confirmed unavailability (quota/auth/model-degraded),
 never on transient network errors.
 
-This is the **leaf executor** of the subprocess model: `lib/execute.js`'s
-`callProvider` spawns `node index.js --only=X --single` to call exactly one
-provider. It cannot itself compose `execute.runChain` (that would spawn
-itself recursively). See `DESIGN.md` for the layering.
+`$_S` denotes this skill's own directory. Set it before running:
+```bash
+export _S="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # or the skill's absolute path
+```
 
 ## Contract
 
@@ -28,8 +40,8 @@ line on stderr:
 A run is proven by its receipt. `run_id` is random and persisted to
 `data/receipts.jsonl`, so a fabricated receipt fails a `grep <run_id>` check.
 If you (the caller AI) skip the run and answer from model knowledge instead,
-there is no receipt — that is detectable, not a matter of trust. `--smoke`
-and `--doctor` are the only modes that intentionally emit no receipt.
+there is no receipt — detectable, not a matter of trust. `--smoke` and
+`--doctor` are the only modes that intentionally emit no receipt.
 
 ## Prerequisites
 
@@ -37,7 +49,7 @@ and `--doctor` are the only modes that intentionally emit no receipt.
 # Chrome with CDP on 9222, using a profile with AI logins.
 cp .env.example .env   # set CHROMIUM_PATH to system Chrome + CHROME_PROFILE
 bash scripts/start-chrome-debug.sh
-node skills/AgentChat-WebExtended/index.js --doctor   # confirm CDP reachable
+node "$_S/index.js" --doctor   # confirm CDP reachable
 ```
 
 One-time manual login per provider in that Chrome profile (Gemini, ChatGPT,
@@ -46,13 +58,13 @@ Claude, Qwen, Kimi, MiniMax, MiMo, DeepSeek, Doubao).
 ## Invocation
 
 ```bash
-node skills/AgentChat-WebExtended/index.js "Your prompt"
-echo "Prompt from stdin" | node skills/AgentChat-WebExtended/index.js
-node skills/AgentChat-WebExtended/index.js --from=ChatGPT "prompt"   # start from a provider
-node skills/AgentChat-WebExtended/index.js --only=Kimi "prompt"       # exactly one, no cascade
-node skills/AgentChat-WebExtended/index.js --timeout=600000 "long prompt..."
-node skills/AgentChat-WebExtended/index.js --smoke        # reachability of all providers
-node skills/AgentChat-WebExtended/index.js --doctor        # CDP only
+node "$_S/index.js" "Your prompt"
+echo "Prompt from stdin" | node "$_S/index.js"
+node "$_S/index.js" --from=ChatGPT "prompt"     # start from a provider
+node "$_S/index.js" --only=Kimi "prompt"         # exactly one, no cascade
+node "$_S/index.js" --timeout=600000 "long prompt..."
+node "$_S/index.js" --smoke      # reachability of all providers
+node "$_S/index.js" --doctor       # CDP only
 ```
 
 | Flag | Meaning |
@@ -60,7 +72,7 @@ node skills/AgentChat-WebExtended/index.js --doctor        # CDP only
 | `--timeout=N` | total budget ms (all provider attempts), default 600000 |
 | `--timeout-per-provider=N` | per-provider ceiling ms, default `timeout/2` or 180000 |
 | `--from=NAME` | start from NAME, skip earlier chain entries (case-insensitive, abbreviation ok) |
-| `--single` | try only the `--from` provider, no cascade; for callers owning their own fallback+locks (FreeSubAgent) |
+| `--single` | try only the `--from` provider, no cascade; for callers owning their own fallback+locks |
 | `--only=NAME` | `--from=NAME --single` combined; unknown NAME fails loudly |
 | `--close` / `--close-browser` | close tabs/connection after run (default: keep) |
 
@@ -87,41 +99,15 @@ Gemini → ChatGPT → Claude → Qwen → Kimi → MiniMax → MiMo → DeepSee
 Each provider passes a 3-layer check before sending: reachability (page
 loads / not auth-gated), usability (editor editable / not quota-hit), model
 quality (Gemini-only: Pro Extended → Flash → degraded). Degradation triggers
-live in each adapter's `quotaPatterns` (`lib/providers/adapters/<name>.js`) —
-that file is the source of truth; this doc deliberately keeps no second copy.
+live in each adapter's `quotaPatterns` — that file is the source of truth;
+this doc keeps no second copy.
 
-## Output & telemetry
+## Output
 
 - stdout: AI response text on success.
-- stderr: diagnostics, `[fallback]`-prefixed.
+- stderr: diagnostics, `[fallback]`-prefixed, plus the receipt line.
 - telemetry: `data/fallback-telemetry.jsonl` (provider_used, providers_tried,
   fallback_reasons, prompt/response lengths, total_ms, exit_code).
-
-## Provider differences
-
-Each provider's special behavior lives in `lib/providers/adapters/<name>.js`.
-Key differences for caller reference:
-
-| Provider | Key difference |
-|----------|----------------|
-| Gemini | Pro Extended activation, bursty-output detection, 120s stop-btn extension, Action Toolbar completion anchor |
-| ChatGPT | 3-tier input (clipboard→simulated paste→keyboard), React send-button state verification |
-| Claude | ProseMirror editor, "Thinking" placeholder filter, embedded search-block strip |
-| Qwen | React SPA 3s delay, stop-btn detached mode, model-name prefix strip |
-| Kimi | new-session per call, send-button-container disabled detection, adaptive stability window |
-| MiniMax | TipTap/ProseMirror async mount 4s delay, `aria-label="发送消息"` non-button send |
-| MiMo | React SPA 4s delay, DOM-traversal send button (no stable CSS selector) |
-| DeepSeek | standard pipeline, ds-markdown response |
-| Doubao | React SPA 4s delay, Semi Design textarea, `#flow-end-msg-send` send button |
-
-## Adding a provider
-
-Create `lib/providers/adapters/<name>.js` as a module implementing the Adapter
-interface (see `DESIGN.md`): required data (`key`, `url`, `authDomains`,
-`editorSelectors`, `responseSelectors`) + optional methods (`prepare`/
-`findEditor`/`input`/`send`) that override bridge-helper defaults. Add the
-entry to `PROVIDER_CHAIN` in `lib/providers/chain.js` and the key to
-`PROVIDER_KEYS` in `index.js`.
 
 ## Gotchas
 
@@ -135,13 +121,14 @@ entry to `PROVIDER_CHAIN` in `lib/providers/chain.js` and the key to
   one-minute fix instead of a blind hunt.
 - One file lock per provider key (`~/.local/state/agentchat/`). Two workers
   cannot run the same provider concurrently.
-- `--keep-tabs` is the default — subprocesses never close the user's browser.
+- `--keep-tabs` is the default — the process never closes the user's browser.
 
-## Code location
+## When NOT to use
 
-- `index.js` — CLI entry + in-process fallback (`tryAllProviders`)
-- `lib/bridge/run.js` — `createProviderRunner`, the 10-step flow skeleton
-- `lib/bridge/{dom,completion,overlays,extract,contract}.js` — kernel helpers
-- `lib/providers/adapters/<name>.js` — per-provider DOM coupling
-- `lib/providers/chain.js` — priority order (shared with FreeSubAgent)
-- `lib/execute.js` — subprocess `callProvider`/`runChain` (orchestration layer above this leaf)
+- Interactive multi-turn conversations needing cross-call context (each provider
+  has independent session state per invocation).
+- Tasks where provider identity matters and automatic fallback is unwanted —
+  use `--only=NAME` to pin one.
+
+For architecture, the adapter contract, layering, and how to add a provider,
+see `DESIGN.md` (developer-facing, not needed to use this skill).
