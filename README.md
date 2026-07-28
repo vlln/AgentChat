@@ -36,7 +36,7 @@
 ### 1. 安装
 
 ```bash
-git clone https://github.com/ziwang-Physics/AgentChat.git && cd AgentChat
+git clone https://github.com/vlln/AgentChat.git && cd AgentChat
 
 # Python 依赖（Chrome daemon — 使用系统 Chrome，不需要 Playwright Chromium）
 pip3 install playwright websocket-client
@@ -242,4 +242,4 @@ sleep 2 && bash scripts/start-chrome-debug.sh
 
 ## 📜 License
 
-MIT © [ziwang-Physics](https://github.com/ziwang-Physics)
+MIT © [vlln](https://github.com/vlln)
