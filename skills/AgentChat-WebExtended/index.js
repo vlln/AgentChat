@@ -33,7 +33,8 @@ const fs = require('fs');
 const path = require('path');
 
 const { ProviderError, classifyError } = require('../lib/errors');
-const { createProviderRunner, appendWithRotation } = require('../lib/providerFactory');
+const { createProviderRunner } = require('../lib/bridge/run');
+const { appendWithRotation } = require('../lib/telemetry');
 const { makeRunId, emitReceipt } = require('../lib/receipt');
 const { log: _log, startTimer: _startTimer, spinner } = require('../lib/terminal');
 const { connectWithRetry: _connectWithRetry, doctorCheck: _doctorCheck } = require('../lib/cdp');

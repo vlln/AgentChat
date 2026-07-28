@@ -7,7 +7,7 @@
  *   - postResponseHook strips "Thinking" placeholder + embedded search-result blocks
  */
 
-const { COMMON_DISMISS_PATTERNS } = require('../../providerFactory');
+const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
 
 module.exports = {
     key: 'claude',

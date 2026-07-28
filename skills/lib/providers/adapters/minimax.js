@@ -6,7 +6,8 @@
  *   - Send trigger is <div aria-label="发送消息"> (non-button element)
  */
 
-const { COMMON_CN_QUOTA_PATTERNS, COMMON_DISMISS_PATTERNS } = require('../../providerFactory');
+const { COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/run');
+const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
 const { makeStillWorkingCheck } = require('../../stillWorking');
 
 // Hoisted so the still-working probe judges the same container family the

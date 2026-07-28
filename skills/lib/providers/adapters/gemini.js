@@ -20,7 +20,9 @@
  *     (RESPONSE_SELECTOR) + dual-draft panels ("选项 A/B") resolved to draft A
  *     in postResponseHook (extractFirstDraft) — drafts are NEVER concatenated
  *
- * Dependencies: lib/geminiModelSwitch.js (ensureProExtended), lib/providerFactory.js (input helpers)
+ * Dependencies: lib/geminiModelSwitch.js (ensureProExtended). Input and
+ * completion hooks are self-contained (own INSERT_TEXT_LIMIT, own model
+ * activation + draft extraction).
  */
 
 const { ensureProExtended, ensureFlash } = require('../../geminiModelSwitch');

@@ -25,8 +25,8 @@ const fs = require('fs');
 
 const { textLooksBusy, makeStillWorkingCheck } =
     require('../skills/lib/stillWorking');
-const { waitForCompletion, extractResponse } =
-    require('../skills/lib/providerFactory');
+const { waitForCompletion } = require('../skills/lib/bridge/completion');
+const { extractResponse } = require('../skills/lib/bridge/extract');
 
 const _q = [];
 function await0(fn) { _q.push(fn); } // sequential async test queue

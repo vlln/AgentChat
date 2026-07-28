@@ -16,14 +16,13 @@
 'use strict';
 
 const { classifyError, STAGES } = require('../errors');
-const { appendWithRotation } = require('../telemetry');
 const { log: _tlog } = require('../terminal');
 const { getSessionUrl, saveSessionUrl, clearSessionUrl } = require('../sessions');
 const { defaultInput, INSERT_TEXT_LIMIT, findEditableElement, clearEditor, clickSend, verifySendEffect, dumpResponseDiagnostics } = require('./dom');
 const { waitForCompletion } = require('./completion');
 const { checkOverlays } = require('./overlays');
 const { extractResponse } = require('./extract');
-const { toAdapter } = require('./contract');
+const { assertAdapter } = require('./contract');
 
 const flog = (key, msg) => { try { _tlog(key || 'factory', msg); } catch (_) {} };
 
@@ -75,12 +74,12 @@ DEFAULTS.input = defaultInput;
  * @returns {(page: Page, prompt: string, timeoutMs: number, ctx: object) => Promise<{success: boolean, response?: string, reason?: string}>}
  */
 function createProviderRunner(cfg) {
-    // Merge defaults, then normalize to the Adapter interface (Phase 2):
-    // legacy configs (with preInputHook/customSend) are lifted by wrapConfig;
-    // native interface modules are validated by assertAdapter. Either way `C`
-    // carries the named methods the steps below dispatch on (prepare/input/send/
-    // findEditor), with defaults applied inline when a method is absent.
-    const C = toAdapter({ ...DEFAULTS, ...cfg });
+    // Merge defaults, then validate the adapter carries the required data
+    // fields (Phase 2: all adapters are now native interface modules — the
+    // legacy wrapConfig bridge is gone). `C` carries the named methods the
+    // steps below dispatch on (prepare/findEditor/input/send), with bridge
+    // helper defaults applied inline when a method is absent.
+    const C = assertAdapter({ ...DEFAULTS, ...cfg });
 
     return async function run(page, prompt, timeoutMs, ctx) {
         const provStart = Date.now();
@@ -342,5 +341,4 @@ module.exports = {
     runConversation: createProviderRunner,
     DEFAULTS,
     COMMON_CN_QUOTA_PATTERNS,
-    appendWithRotation,
 };
