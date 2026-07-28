@@ -227,7 +227,7 @@ await0(async () => {
 
     // Source-level: the overlay login regex must NOT hard-block 退出登录/免登录
     const src = fs.readFileSync(
-        path.join(__dirname, '../skills/lib/providerFactory.js'), 'utf8');
+        path.join(__dirname, '../skills/lib/bridge/overlays.js'), 'utf8');
     const m = src.match(/if \((\/\(\?:\\blog[^\n]+?\/i)\.test\(text\)\) \{/);
     assert('login regex found in source', !!m);
     if (m) {
