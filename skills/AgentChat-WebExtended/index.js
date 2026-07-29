@@ -28,25 +28,17 @@
  *  10 - Total timeout reached (ERR_TIMEOUT)
  *
  * ── Architectural role ─────────────────────────────────────────────────
- * This module has TWO roles, and the distinction matters:
+ * This is the sole skill AND the leaf executor. It connects to the shared
+ * Chrome and runs createProviderRunner() per provider.
  *
- *   1. LEAF EXECUTOR (subprocess target). lib/execute.js's callProvider()
- *      spawns `node index.js --only=X --single` as a child process to call
- *      exactly one provider. As the leaf of the subprocess model, this module
- *      CANNOT itself compose execute.runChain — that would spawn itself
- *      recursively. The orchestration layer (execute.js: call/runChain) sits
- *      ABOVE this leaf.
+ *   - Cascading mode (default, or --from without --single): tryAllProviders()
+ *     walks the chain in-process, first available wins.
+ *   - Single mode (--only=X / --from=X --single): run exactly one provider,
+ *     no cascade. Lets an external caller own its own fallback/locking if it
+ *     ever composes this as a subprocess — though no such orchestration layer
+ *     ships in this repo (see DESIGN.md).
  *
- *   2. IN-PROCESS SKILL (direct CLI). `--from` without `--single` runs
- *      tryAllProviders(), an in-process fallback that connects to the shared
- *      Chrome and runs createProviderRunner() directly per provider. This is a
- *      convenience for direct human CLI use, NOT an orchestration primitive —
- *      the composable fallback lives in execute.js's runChain (subprocess
- *      model) and is what AgentChat-FreeSubAgent / Web-SubAgent-Workflow
- *      compose.
- *
- * See DESIGN.md for the full leaf-executor / orchestration / application
- * layering.
+ * There is no separate orchestration layer above this module.
  */
 
 const { chromium } = require('playwright-core');

@@ -55,41 +55,30 @@ implements the interface.
 ## Layering
 
 ```
-Application skills   Workflow (sequential pipe) · FreeSubAgent (DAG dispatch + domain logic)
-        ↑ compose
-Orchestration         lib/execute.js — callProvider (call) · runChain (fallback)
-        ↑ spawns subprocess
-Leaf executor         AgentChat-WebExtended/index.js (in-process fallback OR --only --single target)
-        ↑ runs
-Kernel                bridge/run.js (createProviderRunner) + bridge/{dom,completion,overlays,extract}
+AgentChat-WebExtended   the skill: in-process fallback (tryAllProviders)
+        ↑ also the leaf executor (CLI: --only/--single runs one provider)
+Kernel                  bridge/run.js (createProviderRunner) + bridge/{dom,completion,overlays,extract,contract}
         ↑ dispatches to
-Adapters              providers/<name>.js — each owns its DOM coupling
+Adapters                providers/<name>.js — each owns its DOM coupling
 ```
 
-WebExtended is the leaf executor. `execute.js`'s `callProvider` spawns
-`node WebExtended/index.js --only=X --single` as a child process. Therefore
-WebExtended cannot compose `execute.runChain` — that would spawn itself
-recursively. The orchestration layer sits above the leaf; the leaf sits above
-the kernel.
+WebExtended is the skill AND the leaf executor. It connects to the shared
+Chrome and runs `createProviderRunner` per provider (`tryAllProviders`), or —
+under `--only=X --single` — runs exactly one provider and returns. There is
+no separate orchestration layer above it: application-level composition
+(sequential pipelines, parallel DAG dispatch) is left to the caller. This
+keeps the repo to exactly one thing — the CDP bridge — with no dead
+orchestration code waiting for a consumer.
 
-## Why no further primitive extraction
+## Why no orchestration primitives here
 
-The orchestration layer is already orthogonal enough. Forcing more abstraction
-would manufacture noise:
-
-- `call` / `fallback` already live in `execute.js` and are already composed by
-  Workflow and FreeSubAgent.
-- `pipe` is already Workflow's current shape (185 lines: search→reason→review,
-  each step a `runChain`, output forwarded). Extracting a `pipe` helper gains
-  nothing — there's one consumer.
-- `dispatch` (FreeSubAgent's wave fan-out) is tightly coupled to its DAG
-  semantics (upstream-output injection, role-based skip lists). It has exactly
-  one consumer. Extracting a generic `dispatch(tasks, workerFn, budgetMs)` would
-  be a primitive with a single user — a false abstraction.
-- WebExtended is a leaf executor, not an orchestration primitive.
-
-Rule applied: extract a primitive only when it has (or will soon have)
-multiple composable consumers. The current code has none pending, so we stop.
+Earlier revisions carried two application skills (a sequential pipeline and a
+parallel DAG dispatcher) plus their `lib/execute.js` subprocess executor. They
+were removed: with no second consumer, `call`/`fallback`/`dispatch`/`pipe`
+primitives would have been false abstractions. The rule applied: extract a
+primitive only when it has (or will soon have) multiple composable consumers.
+A future orchestration layer — if needed — should be built as a separate
+concern on top of this bridge, not bundled into it.
 
 ## Constraints (honest)
 

@@ -15,9 +15,7 @@ Doubao. First available wins; degradation is surfaced in the output.
 
 | Skill | What it does |
 |-------|--------------|
-| **AgentChat-WebExtended** | Send a prompt to one provider; auto-fallback across the chain if it's unavailable. The leaf executor the other two compose. |
-| **Web-SubAgent-Workflow** | Sequential pipeline: plan → search → reason (if complex) → synthesize → review → fix. For tasks needing research + reasoning + a quality pass. |
-| **AgentChat-FreeSubAgent** | Parallel dispatch: decompose a task into a DAG, fan out across providers concurrently, arbitrate the results. For many independent subtasks. |
+| **AgentChat-WebExtended** | Send a prompt to one provider; auto-fallback across the chain if it's unavailable. The CDP bridge and leaf executor. |
 
 Each skill's `SKILL.md` is the agent-facing contract (when to use, I/O,
 gotchas). For architecture and the adapter contract, see [DESIGN.md](DESIGN.md).
@@ -48,14 +46,8 @@ node skills/AgentChat-WebExtended/index.js --doctor
 ## Use
 
 ```bash
-# One prompt, auto-fallback
+# One prompt, auto-fallback across the chain
 /AgentChat-WebExtended write a Python script to parse CSV
-
-# Sequential research → reason → review pipeline
-/Web-SubAgent-Workflow design a high-throughput message queue
-
-# Parallel fan-out across providers
-/AgentChat-FreeSubAgent decompose and run these independent tasks
 ```
 
 A run is proven by its `[receipt] AGENTCHAT_RUN` line — `run_id` is persisted

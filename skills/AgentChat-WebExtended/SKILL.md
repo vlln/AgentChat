@@ -72,7 +72,7 @@ node "$_S/index.js" --doctor       # CDP only
 | `--timeout=N` | total budget ms (all provider attempts), default 600000 |
 | `--timeout-per-provider=N` | per-provider ceiling ms, default `timeout/2` or 180000 |
 | `--from=NAME` | start from NAME, skip earlier chain entries (case-insensitive, abbreviation ok) |
-| `--single` | try only the `--from` provider, no cascade; for callers owning their own fallback+locks |
+| `--single` | try only the `--from` provider, no cascade; pins one provider |
 | `--only=NAME` | `--from=NAME --single` combined; unknown NAME fails loudly |
 | `--close` / `--close-browser` | close tabs/connection after run (default: keep) |
 
