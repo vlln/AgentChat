@@ -1,5 +1,5 @@
 {
-  "name": "agentchat-web-extended",
+  "name": "web-subagent",
   "version": "0.1.0",
   "description": "Multi-provider CDP bridge with automatic fallback",
   "main": "scripts/index.js",

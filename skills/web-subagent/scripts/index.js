@@ -102,7 +102,7 @@ class InvocationContext {
         // receipt line there would be embedded into the answer text.
         emitReceipt({
             skillDir: SKILL_DIR,
-            skill: 'agentchat-web-extended',
+            skill: 'web-subagent',
             runId: this.runId,
             fields: {
                 exit: code,

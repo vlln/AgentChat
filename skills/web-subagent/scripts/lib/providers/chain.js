@@ -1,7 +1,7 @@
 /**
  * PROVIDER_CHAIN — single source of truth for provider priority order.
  *
- * Extracted from agentchat-web-extended/index.js so that consumers that only
+ * Extracted from web-subagent/index.js so that consumers that only
  * need the chain (e.g. FreeSubAgent's buildFallbackChain) don't have to load
  * playwright-core + all 8 adapters just to read a constant array.
  *

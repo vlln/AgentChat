@@ -14,7 +14,7 @@ const { JSDOM } = require('jsdom');
 const fs = require('fs'), path = require('path');
 
 const src = fs.readFileSync(path.join(__dirname,
-    '../skills/agentchat-web-extended/scripts/lib/providers/adapters/gemini.js'), 'utf8');
+    '../skills/web-subagent/scripts/lib/providers/adapters/gemini.js'), 'utf8');
 const SEL   = src.match(/const RESPONSE_SELECTOR = '([^']+)';/)[1];
 const PANEL = src.match(/const DUAL_PANEL_SELECTOR = '([^']+)';/)[1];
 console.log('RESPONSE_SELECTOR  =', JSON.stringify(SEL));
