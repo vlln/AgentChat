@@ -1,15 +1,16 @@
 /**
  * Shared CDP utilities — connect, health check, and doctor diagnostics.
  *
- * Used by WebExtended and FreeSubAgent skills.
+ * Used by the web-subagent skill.
  * Eliminates ~70 lines of duplicated connectWithRetry + doctorCheck logic.
  *
  * NOTE: connectWithRetry takes `chromium` as first arg (imported by caller)
- *       because this lib/ dir has no node_modules — playwright-core lives
- *       under each skill's own node_modules/.
+ *       because playwright-core lives at the skill root's node_modules,
+ *       resolved by walking up from this scripts/lib/ dir.
  */
 
 const http = require('http');
+const path = require('path');
 
 const DEFAULT_CDP_PORT = process.env.CDP_PORT || '9222';
 const CDP_URL = `http://127.0.0.1:${DEFAULT_CDP_PORT}`;
@@ -62,7 +63,7 @@ async function doctorCheck(exitOnFail = true, onLog) {
         return true;
     } catch (e) {
         log('Chrome CDP is NOT reachable on ' + CDP_URL);
-        log('Run: bash scripts/start-chrome-debug.sh');
+        log(`Run: bash "${path.join(__dirname, '..', 'start-chrome-debug.sh')}"`);
         if (exitOnFail) process.exit(1);
         return false;
     }

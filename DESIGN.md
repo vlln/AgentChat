@@ -62,7 +62,7 @@ Kernel                  bridge/run.js (createProviderRunner) + bridge/{dom,compl
 Adapters                providers/<name>.js — each owns its DOM coupling
 ```
 
-WebExtended is the skill AND the leaf executor. It connects to the shared
+web-subagent is the skill AND the leaf executor. It connects to the shared
 Chrome and runs `createProviderRunner` per provider (`tryAllProviders`), or —
 under `--only=X --single` — runs exactly one provider and returns. There is
 no separate orchestration layer above it: application-level composition

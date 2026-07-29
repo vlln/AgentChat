@@ -518,7 +518,7 @@ async function main() {
         browser = await connectWithRetry(CDP_URL);
     } catch (err) {
         log(`FATAL: Cannot connect to Chrome CDP — ${err.message}`);
-        log('Ensure Chrome debug is running: bash ~/start-chrome-debug.sh');
+        log(`Ensure Chrome debug is running: bash "${path.join(__dirname, 'start-chrome-debug.sh')}"`);
         ctx.recordTelemetry(1);
         process.exit(1);
     }
