@@ -1,60 +1,57 @@
 # AgentChat
 
-Bridge web AI to callable providers via CDP, with automatic cross-provider
-fallback. A Claude Code skill suite: one prompt in, one answer out — if a
-provider is unavailable, the next one answers.
+Send a prompt to a web AI through a real browser — no API keys, no billing.
+If the first provider is unavailable, the next one answers automatically.
 
-9 providers: Gemini, ChatGPT, Claude, Qwen, Kimi, MiniMax, MiMo, DeepSeek,
-Doubao. First available wins; degradation is surfaced in the output.
+**How it works.** A Chrome browser controlled via CDP types your prompt into
+the web UI, clicks send, waits for the response, and extracts the text. 9
+providers in a priority chain: Gemini → ChatGPT → Claude → Qwen → Kimi →
+MiniMax → MiMo → DeepSeek → Doubao. Each provider falls through only on
+confirmed unavailability (quota, auth, rate-limit), not on transient errors.
+
+**Design.** The project is a single bridge — no orchestration, no pipelines,
+no multi-agent dispatch. One kernel (`bridge/`) handles the CDP protocol and
+completion polling. Each provider is one adapter file that owns its DOM
+coupling. Adding a provider is one file plus one line in the chain. Adding a
+consumer that chains or dispatches is a separate concern, composed on top.
+
+**Proof of execution.** Every run emits a receipt on stderr. `run_id` is
+random and persisted to disk. No receipt means no run happened — grep-verifiable,
+not a matter of trust.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Providers](https://img.shields.io/badge/Providers-9-orange.svg)](#skills)
-
-## Skills
-
-| Skill | What it does |
-|-------|--------------|
-| **web-subagent** | Send a prompt to one provider; auto-fallback across the chain if it's unavailable. The CDP bridge and leaf executor. |
-
-Each skill's `SKILL.md` is the agent-facing contract (when to use, I/O,
-gotchas). For architecture and the adapter contract, see [DESIGN.md](DESIGN.md).
-
-## Prerequisites
-
-- **Node.js 18+**
-- **A Chrome** with remote debugging on port 9222, using a profile where you've
-  logged into the AI sites you want to use. The skill ships a launcher:
-  ```bash
-  bash skills/web-subagent/scripts/start-chrome-debug.sh
-  ```
-- One-time manual login per provider in that Chrome profile.
 
 ## Install
 
 ```bash
 git clone https://github.com/vlln/AgentChat.git && cd AgentChat
 npm install
-cp skills/web-subagent/.env.example skills/web-subagent/.env   # set CHROMIUM_PATH + CHROME_PROFILE
+cp skills/web-subagent/.env.example skills/web-subagent/.env
 ```
 
-`.env` lives in the skill root (`skills/web-subagent/`); the daemon scripts
-there auto-load it.
+Set `CHROMIUM_PATH` and `CHROME_PROFILE` in `.env`, then:
 
-Verify the bridge reaches Chrome:
 ```bash
+bash skills/web-subagent/scripts/start-chrome-debug.sh
 node skills/web-subagent/scripts/index.js --doctor
 ```
+
+Log into the AI sites you want to use in that Chrome profile. One-time.
 
 ## Use
 
 ```bash
-# One prompt, auto-fallback across the chain
-/web-subagent write a Python script to parse CSV
+node skills/web-subagent/scripts/index.js "Your prompt"
+echo "prompt" | node skills/web-subagent/scripts/index.js
+node skills/web-subagent/scripts/index.js --only=Kimi "pin one provider"
+node skills/web-subagent/scripts/index.js --help
 ```
 
-A run is proven by its `[receipt] AGENTCHAT_RUN` line — `run_id` is persisted
-and grep-verifiable, so a skipped run is detectable.
+## Docs
+
+- `skills/web-subagent/SKILL.md` — full invocation reference, flags, exit codes, gotchas
+- [DESIGN.md](DESIGN.md) — architecture, adapter contract, how to add a provider
 
 ## License
 
