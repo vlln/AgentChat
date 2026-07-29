@@ -24,9 +24,9 @@ gotchas). For architecture and the adapter contract, see [DESIGN.md](DESIGN.md).
 
 - **Node.js 18+**
 - **A Chrome** with remote debugging on port 9222, using a profile where you've
-  logged into the AI sites you want to use. The repo ships a launcher:
+  logged into the AI sites you want to use. The skill ships a launcher:
   ```bash
-  bash scripts/start-chrome-debug.sh
+  bash skills/web-subagent/scripts/start-chrome-debug.sh
   ```
 - One-time manual login per provider in that Chrome profile.
 
@@ -35,8 +35,11 @@ gotchas). For architecture and the adapter contract, see [DESIGN.md](DESIGN.md).
 ```bash
 git clone https://github.com/vlln/AgentChat.git && cd AgentChat
 npm install
-cp .env.example .env   # set CHROMIUM_PATH to your system Chrome + CHROME_PROFILE
+cp skills/web-subagent/.env.example skills/web-subagent/.env   # set CHROMIUM_PATH + CHROME_PROFILE
 ```
+
+`.env` lives in the skill root (`skills/web-subagent/`); the daemon scripts
+there auto-load it.
 
 Verify the bridge reaches Chrome:
 ```bash

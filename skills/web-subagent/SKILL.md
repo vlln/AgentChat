@@ -47,10 +47,13 @@ there is no receipt — detectable, not a matter of trust. `--smoke` and
 
 ```bash
 # Chrome with CDP on 9222, using a profile with AI logins.
-cp .env.example .env   # set CHROMIUM_PATH to system Chrome + CHROME_PROFILE
-bash scripts/start-chrome-debug.sh
-node "$_S/scripts/index.js" --doctor   # confirm CDP reachable
+cp "$_S/.env.example" "$_S/.env"   # set CHROMIUM_PATH to system Chrome + CHROME_PROFILE
+bash "$_S/scripts/start-chrome-debug.sh"   # launches the CDP daemon (idempotent)
+node "$_S/scripts/index.js" --doctor        # confirm CDP reachable
 ```
+
+`.env` lives in the skill root (next to `SKILL.md`). The daemon scripts under
+`$_S/scripts/` auto-load it.
 
 One-time manual login per provider in that Chrome profile (Gemini, ChatGPT,
 Claude, Qwen, Kimi, MiniMax, MiMo, DeepSeek, Doubao).
