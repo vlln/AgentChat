@@ -18,7 +18,7 @@ Claude Desktop / Cursor / 任何 MCP 客户端
     ▼
 AgentChat MCP Server (本 skill, ~200 行)
     │
-    │  child_process.spawn('node', ['agentchat-web-extended/index.js', ...])
+    │  child_process.spawn('node', ['agentchat-web-extended/scripts/index.js', ...])
     ▼
 agentchat-web-extended (8 个 Provider)
     │

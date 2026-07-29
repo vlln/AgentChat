@@ -40,7 +40,7 @@ cp .env.example .env   # set CHROMIUM_PATH to your system Chrome + CHROME_PROFIL
 
 Verify the bridge reaches Chrome:
 ```bash
-node skills/agentchat-web-extended/index.js --doctor
+node skills/agentchat-web-extended/scripts/index.js --doctor
 ```
 
 ## Use

@@ -101,8 +101,8 @@ concern on top of this bridge, not bundled into it.
 
 - `npm test` — 19 assertions across `gemini_selectors` (selector/draft logic)
   and `still_working` (completion phases + login-regex source scan).
-- `node skills/agentchat-web-extended/index.js --doctor` — CDP reachability.
-- `node skills/agentchat-web-extended/index.js --smoke` — all providers.
+- `node skills/agentchat-web-extended/scripts/index.js --doctor` — CDP reachability.
+- `node skills/agentchat-web-extended/scripts/index.js --smoke` — all providers.
 
 ## Provider quirks (developer reference)
 
@@ -130,7 +130,7 @@ non-obvious differences, for maintenance reference:
    `postResponseHook` / `stillGeneratingCheck` as data hooks if needed.
 2. Add the entry to `PROVIDER_CHAIN` in `lib/providers/chain.js` (key, name,
    url, authDomains, optional `recoveryHint` / `tabHosts`).
-3. Add the key to `PROVIDER_KEYS` in `skills/agentchat-web-extended/index.js`
+3. Add the key to `PROVIDER_KEYS` in `skills/agentchat-web-extended/scripts/index.js`
    (auto-registers a runner via `createProviderRunner`).
 4. Validate: `assertAdapter` fails fast at load if required fields are missing;
    `npm test` covers shared patterns; `--only=<name> --single` exercises the

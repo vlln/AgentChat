@@ -66,7 +66,7 @@ const doctorCheck = () => _doctorCheck(true, log);
 const CDP_URL = `http://127.0.0.1:${process.env.CDP_PORT || '9222'}`;
 const DEFAULT_TOTAL_TIMEOUT = 600_000; // 10 min total across all providers
 const DEFAULT_PROVIDER_TIMEOUT = 180_000; // 3 min per provider
-const SKILL_DIR = path.dirname(__filename); // skill directory for telemetry
+const SKILL_DIR = path.join(path.dirname(__filename), '..'); // skill root (parent of scripts/) for telemetry
 
 // ══════════════════════════════════════════════════════════════════════════════
 // INVOCATION CONTEXT — per-run state isolated from module globals (P0-2)

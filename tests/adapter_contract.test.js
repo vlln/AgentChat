@@ -16,8 +16,8 @@
 const path = require('path');
 const fs = require('fs');
 
-const ADAPTERS_DIR = path.join(__dirname, '..', 'skills', 'agentchat-web-extended', 'lib', 'providers', 'adapters');
-const { assertAdapter, REQUIRED } = require('../skills/agentchat-web-extended/lib/bridge/contract');
+const ADAPTERS_DIR = path.join(__dirname, '..', 'skills', 'agentchat-web-extended', 'scripts', 'lib', 'providers', 'adapters');
+const { assertAdapter, REQUIRED } = require('../skills/agentchat-web-extended/scripts/lib/bridge/contract');
 
 let pass = 0, fail = 0;
 const assert = (name, cond, detail = '') => {

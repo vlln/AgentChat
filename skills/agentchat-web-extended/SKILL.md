@@ -49,7 +49,7 @@ there is no receipt — detectable, not a matter of trust. `--smoke` and
 # Chrome with CDP on 9222, using a profile with AI logins.
 cp .env.example .env   # set CHROMIUM_PATH to system Chrome + CHROME_PROFILE
 bash scripts/start-chrome-debug.sh
-node "$_S/index.js" --doctor   # confirm CDP reachable
+node "$_S/scripts/index.js" --doctor   # confirm CDP reachable
 ```
 
 One-time manual login per provider in that Chrome profile (Gemini, ChatGPT,
@@ -58,13 +58,13 @@ Claude, Qwen, Kimi, MiniMax, MiMo, DeepSeek, Doubao).
 ## Invocation
 
 ```bash
-node "$_S/index.js" "Your prompt"
-echo "Prompt from stdin" | node "$_S/index.js"
-node "$_S/index.js" --from=ChatGPT "prompt"     # start from a provider
-node "$_S/index.js" --only=Kimi "prompt"         # exactly one, no cascade
-node "$_S/index.js" --timeout=600000 "long prompt..."
-node "$_S/index.js" --smoke      # reachability of all providers
-node "$_S/index.js" --doctor       # CDP only
+node "$_S/scripts/index.js" "Your prompt"
+echo "Prompt from stdin" | node "$_S/scripts/index.js"
+node "$_S/scripts/index.js" --from=ChatGPT "prompt"     # start from a provider
+node "$_S/scripts/index.js" --only=Kimi "prompt"         # exactly one, no cascade
+node "$_S/scripts/index.js" --timeout=600000 "long prompt..."
+node "$_S/scripts/index.js" --smoke      # reachability of all providers
+node "$_S/scripts/index.js" --doctor       # CDP only
 ```
 
 | Flag | Meaning |

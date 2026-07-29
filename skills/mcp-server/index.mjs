@@ -34,7 +34,7 @@ import { z } from "zod";
 // ── 配置 ──────────────────────────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = path.resolve(__dirname, "../..");
-const WEBEXT_INDEX = path.join(PROJECT_DIR, "skills/agentchat-web-extended/index.js");
+const WEBEXT_INDEX = path.join(PROJECT_DIR, "skills/agentchat-web-extended/scripts/index.js");
 const NODE_EXE = process.execPath;
 const DEFAULT_TIMEOUT = 600_000;    // 10 分钟总超时
 const DEFAULT_PROV_TIMEOUT = 180_000; // 3 分钟单 Provider
