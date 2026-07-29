@@ -99,8 +99,8 @@ concern on top of this bridge, not bundled into it.
 
 ## Verification
 
-- `npm test` — 19 assertions across `gemini_selectors` (selector/draft logic)
-  and `still_working` (completion phases + login-regex source scan).
+- `npm test` — 154 assertions: contract validation (78), Gemini selector/draft
+  logic (19), completion phases + overlay login-regex source scan (57).
 - `node skills/web-subagent/scripts/index.js --doctor` — CDP reachability.
 - `node skills/web-subagent/scripts/index.js --smoke` — all providers.
 
@@ -129,7 +129,8 @@ non-obvious differences, for maintenance reference:
    `send`) overriding bridge-helper defaults. Add `validateEditor` /
    `postResponseHook` / `stillGeneratingCheck` as data hooks if needed.
 2. Add the entry to `PROVIDER_CHAIN` in `lib/providers/chain.js` (key, name,
-   url, authDomains, optional `recoveryHint` / `tabHosts`).
+   optional `recoveryHint` / `tabHosts`). `url` and `authDomains` are hydrated
+   from the adapter config — no duplication.
 3. Add the key to `PROVIDER_KEYS` in `skills/web-subagent/scripts/index.js`
    (auto-registers a runner via `createProviderRunner`).
 4. Validate: `assertAdapter` fails fast at load if required fields are missing;

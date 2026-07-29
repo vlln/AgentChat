@@ -16,6 +16,15 @@ const COMMON_DISMISS_PATTERNS = [
     /try\s*(?:the\s*)?new/i, /introducing/i,
 ];
 
+// Common CN-provider quota-exhaustion patterns. Used by adapters that target
+// mainland-Chinese AI services (Qwen, Kimi, DeepSeek, MiniMax, MiMo, Doubao).
+const COMMON_CN_QUOTA_PATTERNS = [
+    /额度.*(?:已|用).*(?:完|尽|满)/i,
+    /quota\s*(?:exceeded|limit)/i,
+    /次数.*(?:已|用).*(?:完|尽)/i,
+    /请.*(?:充值|升级|续费)/i,
+];
+
 // ══════════════════════════════════════════════════════════════════════════════
 // OVERLAY CHECK — detect and handle modals/dialogs blocking the input area
 // ══════════════════════════════════════════════════════════════════════════════
@@ -161,4 +170,5 @@ module.exports = {
     checkOverlays,
     tryDismissOverlay,
     COMMON_DISMISS_PATTERNS,
+    COMMON_CN_QUOTA_PATTERNS,
 };

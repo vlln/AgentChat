@@ -1,11 +1,6 @@
 /**
  * Doubao (豆包) provider adapter config.
  *
- * Phase 2: first NATIVE interface adapter — imports shared patterns directly
- * from bridge/overlays (not the providerFactory shim) and carries only data
- * fields. All behavioral steps (prepare/findEditor/input/send/extract) fall
- * through to the runner's bridge-helper defaults. No hooks, no overrides.
- *
  * ByteDance's AI chatbot at doubao.com.
  * Uses a React SPA with CSS modules (Semi Design / custom design system).
  *
@@ -16,19 +11,33 @@
  *     - User messages are in flex justify-end with bg-g-send-msg-bubble-bg
  *     - Assistant messages are left-aligned, same md-box-root container
  *     - Both have data-streaming="false" when complete
+ *
+ * Overrides (React controlled textarea — needs per-char events, not fill/insertText):
+ *   - input: keyboard.type for React onChange
+ *   - clearEditor: no-op (Ctrl+A disrupts React state)
+ *   - send: custom click + wait for button hidden (editor ref detached after send)
  */
 
-const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
-const { inputViaSimulatedPaste } = require('../../bridge/dom');
+const { COMMON_DISMISS_PATTERNS, COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/overlays');
+const { inputViaSimulatedPaste, clickSend } = require('../../bridge/dom');
+
+const DOUBAO_SEND_SELECTORS = [
+    '#flow-end-msg-send',
+    '#input-engine-container button:first-of-type',
+    '#input-engine-container button',
+];
+const DOUBAO_SEND_FALLBACK = 'ControlOrMeta+Enter';
 
 const RESPONSE_SELECTORS = [
-    // Doubao's conversation is a v_list of v_list_row items (user + assistant
-    // rows share the class). The runner's .last() + echo-guard + baseline-count
-    // guard pick the newest assistant row. The old md-box-root selectors were
-    // stale (Doubao's UI moved to v_list) and the generic [class*="content"]
-    // fallback false-matched the input-guidance container.
-    '[class*="v_list_row"]',
-    '[class*="v_list"] [class*="markdown"]',
+    // v1: message-list → md-box-root is the semantic content container.
+    // Both user and assistant use the same class; the factory's .last()
+    // resolves to the most recent message. The echo guard filters out
+    // user-message hits (text near-identical to prompt).
+    '[class*="message-list"] [class*="md-box-root"]',
+    '[class*="md-box-root"]',
+    // Generic fallbacks
+    '[class*="markdown"]',
+    '[class*="content"]',
 ];
 
 module.exports = {
@@ -37,6 +46,7 @@ module.exports = {
     navPostDelay: 4000, // React SPA render time
     authDomains: ['doubao.com/login', 'www.doubao.com/login', 'sso.doubao.com'],
     quotaPatterns: [
+        ...COMMON_CN_QUOTA_PATTERNS,
         /高峰.*算力.*不足/i,
         /(?:额度|次数|用完|用尽|不够|上限).{0,30}(?:升级|充值)/i,
         /额度.*(?:已|用).*(?:完|尽|满)/i,
@@ -62,12 +72,8 @@ module.exports = {
     // Doubao's textarea treats Enter as newline, NOT send.
     // The send button is #flow-end-msg-send — a round icon button inside
     // #input-engine-container with an SVG arrow icon.
-    sendSelectors: [
-        '#flow-end-msg-send',
-        '#input-engine-container button:first-of-type',
-        '#input-engine-container button',
-    ],
-    sendFallback: 'ControlOrMeta+Enter',
+    sendSelectors: DOUBAO_SEND_SELECTORS,
+    sendFallback: DOUBAO_SEND_FALLBACK,
 
     responseSelectors: RESPONSE_SELECTORS,
     responseSelectorTimeout: 60_000,
@@ -75,11 +81,14 @@ module.exports = {
     minResponseLength: 3,
 
     // ── input: Semi Design React textarea ──
-    // React controlled textarea: editor.fill() sets the DOM value but React's
-    // internal state ignores direct value sets → send submits an empty prompt.
-    // keyboard.type() fires per-char keydown/input events → React onChange →
-    // state updates → send submits the real prompt. Long prompts use simulated
-    // paste (triggers React onPaste) to stay fast.
+    // React controlled textarea: editor.fill() sets DOM value but React
+    // ignores direct value sets → send submits empty. keyboard.type() fires
+    // per-char keydown/input → React onChange → state update → real send.
+    // Long prompts use simulated paste (triggers React onPaste) for speed.
+    //
+    // DO NOT clearEditor before input: the runner's clearEditor (Ctrl+A →
+    // Backspace) disrupts React's focus/state tracking so the subsequent
+    // keyboard.type is ignored. The textarea is empty on a new message anyway.
     input: async (page, editor, prompt) => {
         await editor.click().catch(() => {});
         if (prompt.length > 500) {
@@ -94,5 +103,23 @@ module.exports = {
             : (el.innerText || el.textContent || '').length
         ).catch(() => 0);
         return len > prompt.length * 0.8;
+    },
+
+    // clearEditor (Ctrl+A → Backspace) disrupts React's controlled textarea.
+    // The editor is empty on a new message; skip the default clear.
+    clearEditor: async () => true,
+
+    // Doubao's React SPA re-renders the input area after send, detaching the
+    // editor element. The default verifySendEffect (which reads the old editor
+    // reference) then sees a detached element → returns 'unsent' → the runner
+    // retries with Enter (which inserts a newline, not sends). This custom send
+    // clicks the send button and verifies via the send button disappearing
+    // (becomes !hidden) rather than via the stale editor reference.
+    send: async (page, editor) => {
+        await clickSend(page, editor, DOUBAO_SEND_SELECTORS, DOUBAO_SEND_FALLBACK);
+        // Wait for send button to disappear (React re-renders it as !hidden)
+        try {
+            await page.locator('#flow-end-msg-send').waitFor({ state: 'hidden', timeout: 5000 });
+        } catch (_) { /* best-effort */ }
     },
 };

@@ -6,7 +6,7 @@
  *   - Send trigger is <div aria-label="发送消息"> (non-button element)
  */
 
-const { COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/run');
+const { COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/overlays');
 const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
 const { makeStillWorkingCheck } = require('../../stillWorking');
 

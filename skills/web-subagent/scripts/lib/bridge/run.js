@@ -20,22 +20,13 @@ const { log: _tlog } = require('../terminal');
 const { getSessionUrl, saveSessionUrl, clearSessionUrl } = require('../sessions');
 const { defaultInput, INSERT_TEXT_LIMIT, findEditableElement, clearEditor, clickSend, verifySendEffect, dumpResponseDiagnostics } = require('./dom');
 const { waitForCompletion } = require('./completion');
-const { checkOverlays } = require('./overlays');
+const { checkOverlays, COMMON_CN_QUOTA_PATTERNS } = require('./overlays');
 const { extractResponse } = require('./extract');
 const { assertAdapter } = require('./contract');
 
 const flog = (key, msg) => { try { _tlog(key || 'factory', msg); } catch (_) {} };
 
 // Chinese-language quota patterns shared across 5+ providers (Qwen, Kimi,
-// MiniMax, MiMo, DeepSeek, ChatGPT). Each adapter's quotaPatterns = its own
-// provider-specific patterns + [...COMMON_CN_QUOTA_PATTERNS].
-const COMMON_CN_QUOTA_PATTERNS = [
-    /额度.*(?:已|用).*(?:完|尽|满)/i,
-    /quota\s*(?:exceeded|limit)/i,
-    /次数.*(?:已|用).*(?:完|尽)/i,
-    /请.*(?:充值|升级|续费)/i,
-];
-
 const DEFAULTS = {
     navTimeout: 45000,
     navWaitUntil: 'domcontentloaded',
@@ -82,6 +73,14 @@ function createProviderRunner(cfg) {
     const C = assertAdapter({ ...DEFAULTS, ...cfg });
 
     return async function run(page, prompt, timeoutMs, ctx) {
+        if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+            const err = new Error('Invalid prompt: must be a non-empty string');
+            return classifyError(err, STAGES.PRE_EDITOR, 'runner');
+        }
+        if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+            const err = new Error(`Invalid timeoutMs: ${timeoutMs}`);
+            return classifyError(err, STAGES.PRE_EDITOR, 'runner');
+        }
         const provStart = Date.now();
 
         // ── Step 1: Navigate ──
@@ -257,7 +256,7 @@ function createProviderRunner(cfg) {
         // Stage label fixed: input failures were previously mislabeled EDITOR_FIND,
         // skewing telemetry-based failure analysis.
         try {
-            await clearEditor(page, editor);
+            await (C.clearEditor || clearEditor)(page, editor);
             const inputOk = await (C.input || defaultInput)(page, editor, prompt, { timeoutMs });
             if (!inputOk) {
                 return classifyError(
@@ -393,7 +392,6 @@ function createProviderRunner(cfg) {
 
 module.exports = {
     createProviderRunner,
-    runConversation: createProviderRunner,
     DEFAULTS,
     COMMON_CN_QUOTA_PATTERNS,
 };

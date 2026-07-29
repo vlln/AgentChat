@@ -25,6 +25,7 @@ const turndown = new TurndownService({
  * essentially the prompt itself, fail the EXTRACT stage instead.
  */
 async function extractResponse(page, responseEl, config, prompt) {
+    const minLen = typeof config.minResponseLength === 'number' ? config.minResponseLength : 3;
     let text;
 
     if (config.responseFormat === 'markdown') {
@@ -33,13 +34,13 @@ async function extractResponse(page, responseEl, config, prompt) {
         // innerHTML preserves the rendered structure, and turndown converts
         // it back to well-formed Markdown.
         const html = await responseEl.evaluate(el => el.innerHTML);
-        if (!html || html.trim().length < config.minResponseLength) return null;
+        if (!html || html.trim().length < minLen) return null;
         text = turndown.turndown(html).trim();
     } else {
         text = await responseEl.evaluate(el => (el.innerText || el.textContent || '').trim());
     }
 
-    if (!text || text.length < config.minResponseLength) return null;
+    if (!text || text.length < minLen) return null;
 
     if (prompt && typeof prompt === 'string') {
         const norm = s => s.replace(/\s+/g, ' ').trim();
@@ -63,7 +64,7 @@ async function extractResponse(page, responseEl, config, prompt) {
         text = await config.postResponseHook(page, text, config);
     }
 
-    if (!text || text.length < config.minResponseLength) return null;
+    if (!text || text.length < minLen) return null;
 
     return text;
 }

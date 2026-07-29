@@ -69,21 +69,29 @@ async function isStillGenerating(page) {
 // resets for short, valid answers (e.g. "42", single-word responses) that lack
 // punctuation. Without this guard, `stillGeneratingCheck` keeps returning true,
 // resetting the stability clock every cycle until the full Gemini budget burns out.
-let _preGenStreak = 0;
+//
+// State is stored on the page object (not module-level) to avoid race conditions
+// when multiple invocations share the same process (tests, future daemon mode).
 const MAX_PREGEN_STREAK = 8; // ~16s at default 2s poll interval
+const _STREAK_KEY = Symbol('_preGenStreak');
 
-function looksLikePreGeneration(text) {
+function _getStreak(page) { return page[_STREAK_KEY] || 0; }
+function _setStreak(page, v) { page[_STREAK_KEY] = v; }
+
+function looksLikePreGeneration(page, text) {
     const trimmed = (text || '').trim();
-    if (trimmed.length === 0) { _preGenStreak++; return _preGenStreak <= MAX_PREGEN_STREAK; }
-    if (trimmed.length > 300) { _preGenStreak = 0; return false; }
+    let s = _getStreak(page);
+    if (trimmed.length === 0) { s++; _setStreak(page, s); return s <= MAX_PREGEN_STREAK; }
+    if (trimmed.length > 300) { _setStreak(page, 0); return false; }
     for (const pat of STILL_WORKING_TEXT) {
-        if (pat.test(trimmed)) { _preGenStreak++; return _preGenStreak <= MAX_PREGEN_STREAK; }
+        if (pat.test(trimmed)) { s++; _setStreak(page, s); return s <= MAX_PREGEN_STREAK; }
     }
     if (trimmed.length < 150 && !/[。！？\.!\?;；，\n]{1}/.test(trimmed)) {
-        _preGenStreak++;
-        return _preGenStreak <= MAX_PREGEN_STREAK; // eventually accept as final
+        s++;
+        _setStreak(page, s);
+        return s <= MAX_PREGEN_STREAK; // eventually accept as final
     }
-    _preGenStreak = 0;
+    _setStreak(page, 0);
     return false;
 }
 
@@ -218,11 +226,9 @@ module.exports = {
     // from process.env); logFn defaulted to the module's glog anyway.
     prepare: async (page) => {
         const log = glog;
-        // Per-run reset: _preGenStreak is module-level state. In a long-lived
-        // process that runs this adapter more than once (tests, future daemon
-        // mode), a streak left at MAX from the previous run would make
-        // looksLikePreGeneration() reject fresh filler on the very first poll.
-        _preGenStreak = 0;
+        // Per-run reset: _preGenStreak is stored on the page object to prevent
+        // race conditions when multiple invocations share the same process.
+        _setStreak(page, 0);
         // (URL validation moved to the factory's Step-2 auth check via
         //  blockedUrlPatterns — a wrong page is now 'auth', not 'error'.)
 
@@ -343,7 +349,7 @@ module.exports = {
         // document-order last — draft A is swapped in later by postResponseHook).
         const text = await page.locator(RESPONSE_SELECTOR).last()
             .evaluate(el => el.innerText || el.textContent || '').catch(() => '');
-        return looksLikePreGeneration(text);
+        return looksLikePreGeneration(page, text);
     },
 
     // ── Input: Angular-specific (fill() for clear, dispatchEvent for CD) ──

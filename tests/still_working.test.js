@@ -211,7 +211,7 @@ await0(async () => {
         await kimi.stillGeneratingCheck(page, { text: '…\n获取网页 5 个网页' }) === true);
 
     for (const k of ['minimax', 'deepseek', 'qwen', 'mimo']) {
-        const a = require(`./skills/web-subagent/scripts/lib/providers/adapters/${k}`);
+        const a = require(`../skills/web-subagent/scripts/lib/providers/adapters/${k}`);
         assert(`${k}: shared check wired`, typeof a.stillGeneratingCheck === 'function'
             && Number.isFinite(a.stillGeneratingMaxHoldMs));
     }

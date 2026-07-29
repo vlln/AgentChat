@@ -8,7 +8,7 @@
  *   - postResponseHook strips model-name prefix (e.g. "Qwen3.7-Max\n")
  */
 
-const { COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/run');
+const { COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/overlays');
 const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
 const { makeStillWorkingCheck } = require('../../stillWorking');
 

@@ -505,6 +505,11 @@ async function main() {
         prompt = chunks.join('').trim();
     }
     if (!prompt && !args.includes('--smoke')) {
+        if (args.includes('--help') || args.includes('-h')) {
+            console.error('Usage: node index.js [--timeout=MS] [--from=NAME] [--only=NAME] [--single] [--locale=xx_XX] [--keep-tabs] [--close] [--smoke] [--doctor] "Your prompt"');
+            console.error('       echo "prompt" | node index.js [flags]');
+            process.exit(0);
+        }
         console.error('Usage: node index.js [--timeout=MS] [--from=NAME] [--only=NAME] [--single] [--locale=xx_XX] [--keep-tabs] [--close] [--smoke] [--doctor] "Your prompt"');
         console.error('       echo "prompt" | node index.js [flags]');
         process.exit(1);
@@ -552,6 +557,9 @@ async function main() {
             // happens; exitCode-and-return is NOT an option in this file.)
             ctx.recordTelemetry(0);
             process.stdout.write(result.response + '\n', () => process.exit(0));
+            // Safety net: if the write callback never fires (broken pipe, zombie
+            // fd), force-exit after 5s so the process doesn't hang forever.
+            setTimeout(() => process.exit(0), 5000).unref();
             return;
         }
 

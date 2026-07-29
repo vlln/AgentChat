@@ -7,7 +7,7 @@
  *   - customSend overrides the factory's default clickSend
  */
 
-const { COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/run');
+const { COMMON_CN_QUOTA_PATTERNS } = require('../../bridge/overlays');
 const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
 const { makeStillWorkingCheck } = require('../../stillWorking');
 
@@ -73,7 +73,23 @@ module.exports = {
                 }
             } catch (_) { /* try next placeholder variant */ }
         }
-        if (!sent) await page.keyboard.press('Enter');
+        if (!sent) {
+            // Diagnostic: the grandparent-DOM-traversal is brittle — dump the
+            // textarea's ancestor chain so a future UI drift is diagnosable.
+            try {
+                const diag = await page.locator('textarea').first()
+                    .evaluate(el => {
+                        const chain = [];
+                        let p = el.parentElement;
+                        for (let i = 0; i < 5 && p; i++, p = p.parentElement) {
+                            chain.push(`${p.tagName.toLowerCase()}${p.className ? '.' + p.className.split(/\s+/).slice(0, 3).join('.') : ''}`);
+                        }
+                        return chain.join(' > ');
+                    }).catch(() => '');
+                console.error(`[mimo] send traversal failed — textarea ancestor chain: ${diag}`);
+            } catch (_) { /* best-effort */ }
+            await page.keyboard.press('Enter');
+        }
     },
     responseSelectors: RESPONSE_SELECTORS,
     stabilityWindow: 15_000,
