@@ -34,7 +34,7 @@ import { z } from "zod";
 // ── 配置 ──────────────────────────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = path.resolve(__dirname, "../..");
-const WEBEXT_INDEX = path.join(PROJECT_DIR, "skills/AgentChat-WebExtended/index.js");
+const WEBEXT_INDEX = path.join(PROJECT_DIR, "skills/agentchat-web-extended/index.js");
 const NODE_EXE = process.execPath;
 const DEFAULT_TIMEOUT = 600_000;    // 10 分钟总超时
 const DEFAULT_PROV_TIMEOUT = 180_000; // 3 分钟单 Provider
@@ -42,7 +42,7 @@ const DEFAULT_PROV_TIMEOUT = 180_000; // 3 分钟单 Provider
 // ── 工具：执行 WebExtended CLI ────────────────────────────────────────────
 
 /**
- * 调用 AgentChat-WebExtended CLI，返回 stdout。
+ * 调用 agentchat-web-extended CLI，返回 stdout。
  * @param {string} prompt
  * @param {object} opts
  * @returns {Promise<string>}

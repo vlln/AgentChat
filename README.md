@@ -15,7 +15,7 @@ Doubao. First available wins; degradation is surfaced in the output.
 
 | Skill | What it does |
 |-------|--------------|
-| **AgentChat-WebExtended** | Send a prompt to one provider; auto-fallback across the chain if it's unavailable. The CDP bridge and leaf executor. |
+| **agentchat-web-extended** | Send a prompt to one provider; auto-fallback across the chain if it's unavailable. The CDP bridge and leaf executor. |
 
 Each skill's `SKILL.md` is the agent-facing contract (when to use, I/O,
 gotchas). For architecture and the adapter contract, see [DESIGN.md](DESIGN.md).
@@ -40,14 +40,14 @@ cp .env.example .env   # set CHROMIUM_PATH to your system Chrome + CHROME_PROFIL
 
 Verify the bridge reaches Chrome:
 ```bash
-node skills/AgentChat-WebExtended/index.js --doctor
+node skills/agentchat-web-extended/index.js --doctor
 ```
 
 ## Use
 
 ```bash
 # One prompt, auto-fallback across the chain
-/AgentChat-WebExtended write a Python script to parse CSV
+/agentchat-web-extended write a Python script to parse CSV
 ```
 
 A run is proven by its `[receipt] AGENTCHAT_RUN` line — `run_id` is persisted

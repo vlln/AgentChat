@@ -23,7 +23,7 @@
  * answer.
  *
  * Stream policy (IMPORTANT — do not change casually):
- *   - AgentChat-WebExtended's stdout is a MACHINE CONTRACT: parents
+ *   - agentchat-web-extended's stdout is a MACHINE CONTRACT: parents
  *     (lib/execute.js, the Python SDK, the MCP server) take stdout verbatim
  *     as the AI response. Its receipt therefore goes to STDERR, alongside the
  *     existing "✓ X: USED" marker.

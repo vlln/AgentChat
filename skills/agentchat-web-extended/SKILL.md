@@ -1,5 +1,5 @@
 ---
-name: AgentChat-WebExtended
+name: agentchat-web-extended
 description: >-
   Multi-provider CDP bridge with automatic fallback
   (Gemini→ChatGPT→Claude→Qwen→Kimi→MiniMax→MiMo→DeepSeek→Doubao). Use for AI
@@ -15,7 +15,7 @@ requires:
     - node
 ---
 
-# AgentChat-WebExtended — Multi-Provider CDP Bridge
+# agentchat-web-extended — Multi-Provider CDP Bridge
 
 Priority chain: Gemini (Pro Extended) → ChatGPT → Claude → Qwen → Kimi →
 MiniMax → MiMo → DeepSeek → Doubao. First available provider wins; each step
@@ -34,7 +34,7 @@ diagnostics on stderr. Every real run — including failures — emits a receipt
 line on stderr:
 
 ```
-[receipt] AGENTCHAT_RUN {"run_id":"ac-xxxxxxxxxxxx","skill":"AgentChat-WebExtended","exit":0,"provider_used":"Gemini",...}
+[receipt] AGENTCHAT_RUN {"run_id":"ac-xxxxxxxxxxxx","skill":"agentchat-web-extended","exit":0,"provider_used":"Gemini",...}
 ```
 
 A run is proven by its receipt. `run_id` is random and persisted to

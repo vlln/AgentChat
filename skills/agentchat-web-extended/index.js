@@ -45,12 +45,12 @@ const { chromium } = require('playwright-core');
 const fs = require('fs');
 const path = require('path');
 
-const { ProviderError, classifyError } = require('../lib/errors');
-const { createProviderRunner } = require('../lib/bridge/run');
-const { appendWithRotation } = require('../lib/telemetry');
-const { makeRunId, emitReceipt } = require('../lib/receipt');
-const { log: _log, startTimer: _startTimer, spinner } = require('../lib/terminal');
-const { connectWithRetry: _connectWithRetry, doctorCheck: _doctorCheck } = require('../lib/cdp');
+const { ProviderError, classifyError } = require('./lib/errors');
+const { createProviderRunner } = require('./lib/bridge/run');
+const { appendWithRotation } = require('./lib/telemetry');
+const { makeRunId, emitReceipt } = require('./lib/receipt');
+const { log: _log, startTimer: _startTimer, spinner } = require('./lib/terminal');
+const { connectWithRetry: _connectWithRetry, doctorCheck: _doctorCheck } = require('./lib/cdp');
 
 // ── Adapt shared modules to WebExtended naming conventions ──
 const PREFIX = 'fallback';
@@ -102,7 +102,7 @@ class InvocationContext {
         // receipt line there would be embedded into the answer text.
         emitReceipt({
             skillDir: SKILL_DIR,
-            skill: 'AgentChat-WebExtended',
+            skill: 'agentchat-web-extended',
             runId: this.runId,
             fields: {
                 exit: code,
@@ -121,7 +121,7 @@ class InvocationContext {
 
 // Single source of truth: lib/providers/chain.js (also consumed by FreeSubAgent,
 // which must NOT require this file — that would load playwright-core + 8 adapters).
-const { PROVIDER_CHAIN } = require('../lib/providers/chain');
+const { PROVIDER_CHAIN } = require('./lib/providers/chain');
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PROVIDER RUNNERS — factory-built from adapter configs in lib/providers/adapters/
@@ -137,7 +137,7 @@ const { PROVIDER_CHAIN } = require('../lib/providers/chain');
 
 const PROVIDER_KEYS = ['gemini','chatgpt','claude','qwen','kimi','minimax','mimo','deepseek','doubao'];
 const RUNNERS = Object.fromEntries(PROVIDER_KEYS.map(k => {
-  const cfg = require(`../lib/providers/adapters/${k}`);
+  const cfg = require(`./lib/providers/adapters/${k}`);
   // Gemini uses its own spinner-free runner; all others share the progress spinner
   return [k, createProviderRunner(k === 'gemini' ? cfg : { ...cfg, onProgress: spinner })];
 }));
@@ -483,7 +483,7 @@ async function main() {
             // silently dropped, so the Python `locale` parameter has been a
             // no-op since it shipped. Wire it to the Gemini locale profiles.
             const locKey = a.split('=')[1];
-            const applied = require('../lib/locales/gemini').setLocale(locKey);
+            const applied = require('./lib/locales/gemini').setLocale(locKey);
             if (applied === 'fuzzy' && locKey) {
                 log(`WARN: unknown --locale "${locKey}" — falling back to auto-detect/fuzzy matching`);
             } else {
