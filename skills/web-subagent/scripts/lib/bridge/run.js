@@ -121,6 +121,32 @@ function createProviderRunner(cfg) {
             if (C.navPostDelay > 0) {
                 await page.waitForTimeout(C.navPostDelay);
             }
+
+            // Resume validity probe: a saved session URL may load an
+            // old-conversation view that has NO fresh compose box (the
+            // redirect/auth check above only catches login/404 redirects, not
+            // a successfully-loaded-but-inputless page). If no editor is
+            // visible, clear the session and fall back to the base URL so
+            // Step 5 doesn't fail at EDITOR_FIND.
+            if (usedSessionUrl) {
+                let editorVisible = false;
+                for (const sel of (C.editorSelectors || [])) {
+                    if (await page.locator(sel).first()
+                            .isVisible({ timeout: 500 }).catch(() => false)) {
+                        editorVisible = true;
+                        break;
+                    }
+                }
+                if (!editorVisible) {
+                    flog(C.key, `resumed session has no editor — clearing and retrying with base URL`);
+                    clearSessionUrl(C.key);
+                    await page.goto(C.url, {
+                        waitUntil: C.navWaitUntil,
+                        timeout: C.navTimeout,
+                    });
+                    if (C.navPostDelay > 0) await page.waitForTimeout(C.navPostDelay);
+                }
+            }
         } catch (e) {
             // If the session URL fails (e.g. 404), clear and fall back
             if (getSessionUrl(C.key)) {
@@ -243,6 +269,23 @@ function createProviderRunner(cfg) {
             return classifyError(e, STAGES.INPUT, C.key);
         }
 
+        // ── Step 6.6: overlay re-check — a modal may appear AFTER the editor
+        // was found (focus-triggered, or Doubao's first-visit interstitial).
+        // The Step 3.5 check ran before the editor existed; dismiss anything
+        // new so it doesn't intercept the send click. Best-effort: a hard
+        // block surfaces as OVERLAY_CHECK; a dismissable one closes silently.
+        try {
+            const ov = await checkOverlays(page, C);
+            if (ov.block) {
+                return classifyError(
+                    new Error(ov.detail),
+                    STAGES.OVERLAY_CHECK, C.key, ov.block
+                );
+            }
+        } catch (e) {
+            return classifyError(e, STAGES.OVERLAY_CHECK, C.key);
+        }
+
         // ── Step 6.5: baseline response-element counts (stale-response guard) ──
         // On a reused tab with restored history, phase 2's `.last()` can attach
         // to the PREVIOUS conversation's final message. Counting matches per
@@ -275,10 +318,22 @@ function createProviderRunner(cfg) {
         try {
             const eff = await verifySendEffect(page, editor, prompt, C);
             if (eff === 'unsent') {
+                // A popup may have appeared AFTER Step 6.6's check (focus/
+                // click-triggered, e.g. Doubao's 下载电脑版 interstitial) and
+                // intercepted the send click. Dismiss any new overlay, then
+                // retry the send with the alternate key.
+                const ov = await checkOverlays(page, C).catch(() => ({ block: null }));
+                if (ov && ov.block) {
+                    flog(C.key, `overlay appeared during send — ${ov.detail}`);
+                }
                 const alt = (C.sendFallback === 'Enter') ? 'ControlOrMeta+Enter' : 'Enter';
                 flog(C.key, `send not confirmed — prompt still in editor; retrying with ${alt}`);
                 await editor.focus().catch(() => {});
-                await page.keyboard.press(alt);
+                if (C.send) {
+                    await C.send(page, editor).catch(() => {});
+                } else {
+                    await page.keyboard.press(alt);
+                }
                 await page.waitForTimeout(1500);
             }
         } catch (_) { /* verification is best-effort */ }

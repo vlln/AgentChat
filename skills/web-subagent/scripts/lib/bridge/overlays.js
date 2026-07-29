@@ -33,6 +33,9 @@ const CLOSE_BTN_SEL = [
     'button:has-text("关闭")', 'button:has-text("Got it")',
     'button:has-text("Accept")', 'button:has-text("同意")',
     'button:has-text("知道了")', 'button:has-text("继续")',
+    // "remind me later" — Doubao's 下载电脑版 interstitial dismisses via this
+    'button:has-text("下次提醒我")', 'button:has-text("稍后提醒")',
+    'button:has-text("以后再说")', 'button:has-text("暂不")',
     '[class*="close" i]', 'svg[class*="close" i]',
 ];
 

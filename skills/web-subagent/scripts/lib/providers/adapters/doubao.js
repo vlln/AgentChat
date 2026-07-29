@@ -19,17 +19,16 @@
  */
 
 const { COMMON_DISMISS_PATTERNS } = require('../../bridge/overlays');
+const { inputViaSimulatedPaste } = require('../../bridge/dom');
 
 const RESPONSE_SELECTORS = [
-    // v1: message-list → md-box-root is the semantic content container.
-    // Both user and assistant use the same class; the factory's .last()
-    // resolves to the most recent message. The echo guard filters out
-    // user-message hits (text near-identical to prompt).
-    '[class*="message-list"] [class*="md-box-root"]',
-    '[class*="md-box-root"]',
-    // Generic fallbacks
-    '[class*="markdown"]',
-    '[class*="content"]',
+    // Doubao's conversation is a v_list of v_list_row items (user + assistant
+    // rows share the class). The runner's .last() + echo-guard + baseline-count
+    // guard pick the newest assistant row. The old md-box-root selectors were
+    // stale (Doubao's UI moved to v_list) and the generic [class*="content"]
+    // fallback false-matched the input-guidance container.
+    '[class*="v_list_row"]',
+    '[class*="v_list"] [class*="markdown"]',
 ];
 
 module.exports = {
@@ -74,4 +73,26 @@ module.exports = {
     responseSelectorTimeout: 60_000,
     stabilityWindow: 8_000,
     minResponseLength: 3,
+
+    // ── input: Semi Design React textarea ──
+    // React controlled textarea: editor.fill() sets the DOM value but React's
+    // internal state ignores direct value sets → send submits an empty prompt.
+    // keyboard.type() fires per-char keydown/input events → React onChange →
+    // state updates → send submits the real prompt. Long prompts use simulated
+    // paste (triggers React onPaste) to stay fast.
+    input: async (page, editor, prompt) => {
+        await editor.click().catch(() => {});
+        if (prompt.length > 500) {
+            const ok = await inputViaSimulatedPaste(page, editor, prompt);
+            if (!ok) await page.keyboard.type(prompt, { delay: 15 });
+        } else {
+            await page.keyboard.type(prompt, { delay: 20 });
+        }
+        await page.waitForTimeout(500);
+        const len = await editor.evaluate(el =>
+            (el.value !== undefined && el.tagName === 'TEXTAREA') ? el.value.length
+            : (el.innerText || el.textContent || '').length
+        ).catch(() => 0);
+        return len > prompt.length * 0.8;
+    },
 };
