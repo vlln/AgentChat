@@ -1,9 +1,9 @@
 # AgentChat — Design
 
-AgentChat does one thing: **bridge web AI to callable providers via CDP**, and
-degrade across them when one is unavailable. Everything else (parallel
-dispatch, sequential pipelines, fallback chains) is application logic composed
-on top of that kernel.
+AgentChat does one thing: **bridge web AI to a callable provider via CDP**.
+One provider per invocation — the caller picks which one. No fallback, no
+cascading, no orchestration. Everything else is application logic composed on
+top of that kernel.
 
 Design ethos: Unix. Do one thing well. Orthogonal decoupling. Contracts over
 magic. Few sharp primitives that compose. Honest docs that list constraints.
@@ -55,8 +55,8 @@ implements the interface.
 ## Layering
 
 ```
-web-subagent   the skill: in-process fallback (tryAllProviders)
-        ↑ also the leaf executor (CLI: --only/--single runs one provider)
+web-subagent   the skill: single-provider bridge (--only=NAME)
+        ↑ also the leaf executor (CLI: one provider per invocation)
 Kernel                  bridge/run.js (createProviderRunner) + bridge/{dom,completion,overlays,extract,contract}
         ↑ dispatches to
 Adapters                providers/<name>.js — each owns its DOM coupling
@@ -70,15 +70,13 @@ no separate orchestration layer above it: application-level composition
 keeps the repo to exactly one thing — the CDP bridge — with no dead
 orchestration code waiting for a consumer.
 
-## Why no orchestration primitives here
+## Why no fallback or orchestration here
 
-Earlier revisions carried two application skills (a sequential pipeline and a
-parallel DAG dispatcher) plus their `lib/execute.js` subprocess executor. They
-were removed: with no second consumer, `call`/`fallback`/`dispatch`/`pipe`
-primitives would have been false abstractions. The rule applied: extract a
-primitive only when it has (or will soon have) multiple composable consumers.
-A future orchestration layer — if needed — should be built as a separate
-concern on top of this bridge, not bundled into it.
+The bridge does one thing: send a prompt to one provider, get the answer back.
+Fallback, parallel dispatch, chaining — those are caller concerns. Earlier
+revisions carried a cascading fallback chain and two application skills; they
+were removed. A future orchestration layer — if needed — should be built as a
+separate concern on top of this bridge, not bundled into it.
 
 ## Constraints (honest)
 

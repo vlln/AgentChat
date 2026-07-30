@@ -1,13 +1,11 @@
 # AgentChat
 
 Send a prompt to a web AI through a real browser — no API keys, no billing.
-If the first provider is unavailable, the next one answers automatically.
 
 **How it works.** A Chrome browser controlled via CDP types your prompt into
-the web UI, clicks send, waits for the response, and extracts the text. 9
-providers in a priority chain: Gemini → ChatGPT → Claude → Qwen → Kimi →
-MiniMax → MiMo → DeepSeek → Doubao. Each provider falls through only on
-confirmed unavailability (quota, auth, rate-limit), not on transient errors.
+the web UI, clicks send, waits for the response, and extracts the text.
+9 providers available: Gemini, ChatGPT, Claude, Qwen, Kimi, MiniMax, MiMo,
+DeepSeek, Doubao. You pick one per invocation with `--only=NAME`.
 
 **Design.** The project is a single bridge — no orchestration, no pipelines,
 no multi-agent dispatch. One kernel (`bridge/`) handles the CDP protocol and
@@ -42,9 +40,8 @@ Log into the AI sites you want to use in that Chrome profile. One-time.
 ## Use
 
 ```bash
-node skills/web-subagent/scripts/index.js "Your prompt"
-echo "prompt" | node skills/web-subagent/scripts/index.js
-node skills/web-subagent/scripts/index.js --only=Kimi "pin one provider"
+node skills/web-subagent/scripts/index.js --only=Kimi "Your prompt"
+echo "prompt" | node skills/web-subagent/scripts/index.js --only=Gemini
 node skills/web-subagent/scripts/index.js --help
 ```
 

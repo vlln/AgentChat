@@ -1,44 +1,27 @@
 #!/usr/bin/env node
 /**
- * AI Fallback Chain — Multi-Provider CDP Bridge
+ * AgentChat — CDP bridge from web AI to a callable provider.
  *
- * Priority chain: Gemini (Pro Extended) → ChatGPT → Claude → Qwen → Kimi → MiniMax → MiMo → DeepSeek
- * Falls to next provider on quota exhaustion or service unavailability.
- * Only ONE provider is used per invocation — first available wins.
+ * Sends a prompt to ONE web AI provider via Chrome CDP and returns the answer.
+ * No fallback, no cascading — the caller decides which provider and what to do
+ * on failure.
  *
  * Usage:
- *   node index.js "Your prompt here"
- *   node index.js --timeout=600000 "Long prompt..."
- *   echo "Prompt from stdin" | node index.js
- *   node index.js --smoke          # verify at least one provider reachable
+ *   node index.js --only=Kimi "Your prompt here"
+ *   node index.js --only=ChatGPT --timeout=600000 "Long prompt..."
+ *   echo "Prompt from stdin" | node index.js --only=Gemini
+ *   node index.js --smoke          # verify all providers reachable
  *   node index.js --doctor         # check CDP connectivity only
- *   node index.js --from=ChatGPT   # start from a specific provider
- *   node index.js --from=Claude --single "..."  # try ONLY Claude, no cascade
- *                                   # (used by AgentChat-FreeSubAgent, which owns
- *                                   # its own cross-provider fallback + locking)
  *
  * Exit codes:
  *   0 - Success (response on stdout)
  *   1 - Chrome CDP not reachable (ERR_NO_CDP)
- *   2 - No provider reachable — all auth-gated (ERR_NO_PROVIDER)
- *   3 - Safety rejected by all providers (ERR_SAFETY_REJECTED)
+ *   2 - Provider auth-gated (ERR_AUTH)
+ *   3 - Safety rejected (ERR_SAFETY)
  *   4 - Internal error (ERR_INTERNAL)
- *   5 - All providers rate-limited (ERR_RATE_LIMITED)
- *   9 - All providers exhausted, mixed reasons (ERR_ALL_EXHAUSTED)
- *  10 - Total timeout reached (ERR_TIMEOUT)
- *
- * ── Architectural role ─────────────────────────────────────────────────
- * This is the sole skill AND the leaf executor. It connects to the shared
- * Chrome and runs createProviderRunner() per provider.
- *
- *   - Cascading mode (default, or --from without --single): tryAllProviders()
- *     walks the chain in-process, first available wins.
- *   - Single mode (--only=X / --from=X --single): run exactly one provider,
- *     no cascade. Lets an external caller own its own fallback/locking if it
- *     ever composes this as a subprocess — though no such orchestration layer
- *     ships in this repo (see DESIGN.md).
- *
- * There is no separate orchestration layer above this module.
+ *   5 - Provider rate-limited (ERR_RATE_LIMITED)
+ *   9 - Provider failed, other reason (ERR_EXHAUSTED)
+ *  10 - Timeout (ERR_TIMEOUT)
  */
 
 const { chromium } = require('playwright-core');
@@ -186,196 +169,6 @@ function findProviderPage(context, provider) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FALLBACK ORCHESTRATOR
-// ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * tryAllProviders — iterate through the provider chain, return first success.
- *
- * @param {Browser} browser - CDP browser connection
- * @param {string} prompt - The prompt to send
- * @param {InvocationContext} ctx - Per-invocation context (telemetry)
- * @param {object} options - { totalTimeout, providerTimeout, startFrom, singleAttempt }
- * @returns {{success: true, response: string, provider: string}} | {{success: false, reasons: object}}
- */
-async function tryAllProviders(browser, prompt, ctx, options = {}) {
-    // POLICY: Never close the user's Chrome browser. We are a guest in their session.
-    // Only manage our own tabs — page.close() for cleanup, but NEVER browser.close().
-    const { keepTabs = true } = options;
-    const totalTimeout = options.totalTimeout || DEFAULT_TOTAL_TIMEOUT;
-    const providerTimeout = options.providerTimeout
-        || (options.singleAttempt
-            ? Math.min(DEFAULT_PROVIDER_TIMEOUT, totalTimeout)
-            : Math.min(DEFAULT_PROVIDER_TIMEOUT, Math.floor(totalTimeout / 2)));
-    const overallStart = Date.now();
-
-    // Determine starting index
-    let startIdx = 0;
-    if (options.startFrom) {
-        const searchName = options.startFrom.toLowerCase();
-        // MATCHING FIX: exact key/name match first. Pure substring matching
-        // resolved --only=mini to GEMINI ("gemini".includes("mini") wins by
-        // chain order before MiniMax is ever considered) — under --single that
-        // silently runs a different provider than the one the caller named
-        // (and locked). Substring stays as a convenience fallback for humans
-        // typing --from=gpt etc.
-        startIdx = PROVIDER_CHAIN.findIndex(p =>
-            p.key === searchName || p.name.toLowerCase() === searchName
-        );
-        if (startIdx === -1) startIdx = PROVIDER_CHAIN.findIndex(p =>
-            p.key.includes(searchName) || p.name.toLowerCase().includes(searchName)
-        );
-        if (startIdx === -1) {
-            // ROBUSTNESS: under singleAttempt (--only / --single), silently
-            // resetting to index 0 runs GEMINI while the CALLER believes it ran
-            // the provider it named — and the caller's file lock is held on that
-            // named provider, not Gemini. Two workers then race Gemini with
-            // mismatched locks (exactly the mutual-exclusion break --single was
-            // added to prevent). A misspelled provider must fail loudly, not
-            // impersonate a different one. Only the cascading path (no
-            // singleAttempt) may fall back to starting from the top.
-            if (options.singleAttempt) {
-                const valid = PROVIDER_CHAIN.map(p => p.key).join(', ');
-                log(`ERROR: --only/--single named unknown provider "${options.startFrom}". Valid: ${valid}`);
-                return {
-                    success: false,
-                    reasons: { [options.startFrom]: { reason: 'error',
-                        error_details: { message: `unknown provider: ${options.startFrom}` } } },
-                };
-            }
-            log(`WARN: Provider "${options.startFrom}" not found in chain. Starting from beginning.`);
-            startIdx = 0;
-        } else {
-            log(`Starting from provider index ${startIdx} ("${PROVIDER_CHAIN[startIdx].name}")`);
-        }
-    }
-
-    const context = browser.contexts()[0];
-    if (!context) throw new Error('No active browser context.');
-
-    const fallbackReasons = {};
-    const triedProviders = [];
-
-    // singleAttempt: bound the loop to exactly one provider (startIdx) instead of
-    // cascading through the rest of PROVIDER_CHAIN on failure. Used by callers
-    // (e.g. AgentChat-FreeSubAgent) that implement their own cross-provider
-    // fallback with external locking — without this, a single spawned attempt at
-    // provider X could silently succeed via provider Y further down the chain,
-    // while the caller's lock is only held on X, breaking mutual exclusion between
-    // concurrent orchestrator workers that expect exclusive use of Y.
-    const endIdx = options.singleAttempt ? Math.min(startIdx + 1, PROVIDER_CHAIN.length) : PROVIDER_CHAIN.length;
-
-    for (let i = startIdx; i < endIdx; i++) {
-        const provider = PROVIDER_CHAIN[i];
-        const elapsed = Date.now() - overallStart;
-        const remainingTotal = totalTimeout - elapsed;
-
-        if (remainingTotal < 15000) {
-            log(`Total timeout approaching — ${remainingTotal}ms left. Stopping chain.`);
-            fallbackReasons[provider.key] = { reason: 'total_timeout' };
-            triedProviders.push(provider.key);
-            break;
-        }
-
-        const perProvTimeout = Math.min(providerTimeout, remainingTotal);
-
-        log(`\n▶ Provider ${i + 1}/${PROVIDER_CHAIN.length}: ${provider.name} (${Math.round(perProvTimeout / 1000)}s budget)`);
-        const timer = startTimer(`${provider.name}`);
-
-        let page;
-        let result;
-        let createdPage = false;
-        try {
-            // ── Reuse an existing tab for this provider, or create a new one ──
-            // (see findProviderPage() for why reuse replaced the old skip logic)
-            page = findProviderPage(context, provider);
-            if (page) {
-                log(`  ${provider.name}: reusing existing tab`);
-            } else {
-                page = await context.newPage();
-                createdPage = true;
-            }
-
-            // Grant clipboard permissions
-            try { await context.grantPermissions(['clipboard-read', 'clipboard-write']); } catch (_) { }
-
-            // Dispatch to provider runner (each receives ctx for telemetry tracking)
-            const runner = RUNNERS[provider.key];
-            result = runner
-                ? await runner(page, prompt, perProvTimeout, ctx)
-                : classifyError(new Error(`Unknown provider: ${provider.key}`), 'navigate', provider.key);
-        } catch (err) {
-            const pe = new ProviderError(err, { stage: 'unknown', provider: provider.key });
-            log(`${provider.name}: ${pe.originalName} — ${pe.message}`);
-            result = pe.toResult();
-        } finally {
-            timer.stop();
-        }
-
-        triedProviders.push(provider.key);
-        if (!result.success) {
-            // Close failed provider's tab ONLY if we created it — a reused tab
-            // belongs to the user / a previous session and must be left alone.
-            if (createdPage && page && !page.isClosed()) {
-                try { await page.close(); } catch (_) { }
-            }
-            fallbackReasons[provider.key] = {
-                reason: result.reason || 'error',
-                error_details: result.error_details || null,
-            };
-            log(`✗ ${provider.name}: FAILED — ${result.reason} → falling to next provider`);
-            // Auth-class failures are operator-fixable — print the fix instead
-            // of leaving only an opaque reason string in the logs.
-            if (result.reason === 'auth' && provider.recoveryHint) {
-                log(`  ↳ fix: ${provider.recoveryHint}`);
-            }
-            continue;
-        }
-
-        // SUCCESS: keep or close tab based on --keep-tabs flag (self-created only)
-        // P0-4: use the destructured `keepTabs` (defaults to true) instead of
-        // `!options.keepTabs` — options.keepTabs is undefined when the caller
-        // doesn't pass it explicitly, and !undefined === true, which CLOSES the
-        // tab despite the documented default being "keep."
-        if (createdPage && page && !page.isClosed() && !keepTabs) {
-            try { await page.close(); } catch (_) { }
-        }
-
-        // SUCCESS!
-        ctx.telemetry.provider_used = provider.name;
-        ctx.telemetry.providers_tried = triedProviders;
-        ctx.telemetry.fallback_reasons = fallbackReasons;
-        ctx.telemetry.total_ms = Date.now() - overallStart;
-
-        log(`\n✓ ${provider.name}: USED (${result.response.length} chars, ${ctx.telemetry.total_ms}ms total)`);
-        if (triedProviders.length > 1) {
-            log(`  Fallback chain: ${triedProviders.join(' → ')} (${triedProviders.length - 1} provider(s) skipped)`);
-        }
-        return { success: true, response: result.response, provider: provider.name };
-    }
-
-    // All providers exhausted
-    ctx.telemetry.providers_tried = triedProviders;
-    ctx.telemetry.fallback_reasons = fallbackReasons;
-    ctx.telemetry.total_ms = Date.now() - overallStart;
-
-    log(`\n✗ All ${triedProviders.length} provider(s) exhausted.`);
-    log(`  Reasons: ${JSON.stringify(fallbackReasons)}`);
-
-    // If the first 2+ providers failed with page-load/auth errors,
-    // the proxy or network is likely the root cause, not the providers.
-    const pageFailCount = Object.values(fallbackReasons).filter(r =>
-        String(r.reason).includes('error') || String(r.reason).includes('auth')
-    ).length;
-    if (pageFailCount >= 2) {
-        log('  ⚠  Multiple providers failed with page/auth errors.');
-        log('  ⚠  This may indicate a proxy/network issue — check PROXY_SERVER in .env');
-    }
-
-    return { success: false, reasons: fallbackReasons };
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
 // SMOKE TEST — verify at least one provider is reachable
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -429,10 +222,8 @@ async function main() {
 
     // Parse flags
     let customTimeout = DEFAULT_TOTAL_TIMEOUT;
-    let customProvTimeout = null;
-    let startFrom = null;
+    let providerName = null;
     let keepTabs = true; // Always keep tabs — never close user's browser
-    let singleAttempt = false; // --single: try exactly one provider, no cascade
 
     // Timeouts are milliseconds. Values < 10000 are almost certainly seconds
     // typed by a human (--timeout=900) — normalize instead of silently giving
@@ -458,23 +249,13 @@ async function main() {
         } else if (a.startsWith('--timeout=')) {
             const v = parseInt(a.split('=')[1], 10);
             if (!isNaN(v) && v > 0) customTimeout = normalizeTimeout(v);
-        } else if (a.startsWith('--timeout-per-provider=')) {
-            const v = parseInt(a.split('=')[1], 10);
-            if (!isNaN(v) && v > 0) customProvTimeout = normalizeTimeout(v);
         } else if (a === '--keep-tabs') {
             keepTabs = true;
         } else if (a === '--close' || a === '--close-browser') {
             // Only closes our own tab on success (page.close()) — never browser.close().
             keepTabs = false;
-        } else if (a === '--single') {
-            singleAttempt = true;
         } else if (a.startsWith('--only=')) {
-            // Try exactly ONE provider — no internal fallback. Used by FreeSubAgent
-            // so that fallback control lives solely in the orchestrator layer.
-            startFrom = a.split('=')[1];
-            singleAttempt = true;
-        } else if (a.startsWith('--from=')) {
-            startFrom = a.split('=')[1];
+            providerName = a.split('=')[1];
         } else if (a.startsWith('--locale=')) {
             // FEATURE GAP FIX: --locale was documented (lib/locales/gemini.js
             // header: "CLI 传 --locale=xx_XX") and passed by the Python SDK
@@ -506,12 +287,17 @@ async function main() {
     }
     if (!prompt && !args.includes('--smoke')) {
         if (args.includes('--help') || args.includes('-h')) {
-            console.error('Usage: node index.js [--timeout=MS] [--from=NAME] [--only=NAME] [--single] [--locale=xx_XX] [--keep-tabs] [--close] [--smoke] [--doctor] "Your prompt"');
-            console.error('       echo "prompt" | node index.js [flags]');
+            console.error('Usage: node index.js --only=NAME [--timeout=MS] [--close] [--locale=xx_XX] [--smoke] [--doctor] "Your prompt"');
+            console.error('       echo "prompt" | node index.js --only=NAME [flags]');
             process.exit(0);
         }
-        console.error('Usage: node index.js [--timeout=MS] [--from=NAME] [--only=NAME] [--single] [--locale=xx_XX] [--keep-tabs] [--close] [--smoke] [--doctor] "Your prompt"');
-        console.error('       echo "prompt" | node index.js [flags]');
+        if (!providerName) {
+            console.error('Missing --only=NAME. Specify which provider to use.');
+            console.error('Usage: node index.js --only=NAME [--timeout=MS] [--close] "Your prompt"');
+            process.exit(1);
+        }
+        console.error('Usage: node index.js --only=NAME [--timeout=MS] [--close] [--locale=xx_XX] [--smoke] [--doctor] "Your prompt"');
+        console.error('       echo "prompt" | node index.js --only=NAME [flags]');
         process.exit(1);
     }
 
@@ -535,68 +321,83 @@ async function main() {
             process.exit(0);
         }
 
-        // Run fallback chain (ctx carries isolated state through the chain)
-        const result = await tryAllProviders(browser, prompt, ctx, {
-            totalTimeout: customTimeout,
-            providerTimeout: customProvTimeout,
-            startFrom,
-            keepTabs,
-            singleAttempt,
-        });
+        // Run single provider
+        let resolvedProvider = PROVIDER_CHAIN.find(p => p.key === providerName || p.name.toLowerCase() === providerName);
+        if (!resolvedProvider && providerName) {
+            // Substring fallback for human convenience
+            resolvedProvider = PROVIDER_CHAIN.find(p =>
+                p.key.includes(providerName) || p.name.toLowerCase().includes(providerName)
+            );
+            if (resolvedProvider) {
+                log(`WARN: "${providerName}" matched "${resolvedProvider.name}" (${resolvedProvider.key}). Use exact name to avoid ambiguity.`);
+            }
+        }
+        if (!resolvedProvider) {
+            log(`ERROR: unknown provider "${providerName || '(none)'}". Valid: ${PROVIDER_CHAIN.map(p => p.key).join(', ')}`);
+            ctx.recordTelemetry(4);
+            process.exit(4);
+        }
+        const provStart = Date.now();
+        const context = browser.contexts()[0];
+        if (!context) throw new Error('No active browser context.');
 
-        if (result.success) {
-            // P0 FLUSH FIX: console.log + immediate process.exit truncates piped
-            // stdout at the pipe-buffer boundary (~128KB on Linux, less on
-            // Windows/macOS). A PARTIAL flush still passes the parent executor's
-            // `text.length >= 5` success check, returning corrupted text as
-            // ok:true — the silent-wrong-answer class. This is the "#2 flush
-            // fix" that lib/execute.js's acceptUsedMarker comment references:
-            // exit only from the write callback, after the kernel accepted the
-            // full payload. (process.exit is still required here — the CDP
-            // websocket keeps the event loop alive, so a natural exit never
-            // happens; exitCode-and-return is NOT an option in this file.)
-            ctx.recordTelemetry(0);
-            process.stdout.write(result.response + '\n', () => process.exit(0));
-            // Safety net: if the write callback never fires (broken pipe, zombie
-            // fd), force-exit after 5s so the process doesn't hang forever.
-            setTimeout(() => process.exit(0), 5000).unref();
-            return;
+        let page;
+        let createdPage = false;
+        page = findProviderPage(context, resolvedProvider);
+        if (page) {
+            log(`  ${resolvedProvider.name}: reusing existing tab`);
+        } else {
+            page = await context.newPage();
+            createdPage = true;
+        }
+        try { await context.grantPermissions(['clipboard-read', 'clipboard-write']); } catch (_) { }
+
+        const perProvTimeout = customTimeout;
+        log(`\n▶ Provider: ${resolvedProvider.name} (${Math.round(perProvTimeout / 1000)}s budget)`);
+        const timer = startTimer(`${resolvedProvider.name}`);
+
+        const runner = RUNNERS[resolvedProvider.key];
+        const result = runner
+            ? await runner(page, prompt, perProvTimeout, ctx)
+            : classifyError(new Error(`Unknown provider: ${resolvedProvider.key}`), 'navigate', resolvedProvider.key);
+        timer.stop();
+
+        if (!result.success) {
+            if (createdPage && page && !page.isClosed()) {
+                try { await page.close(); } catch (_) { }
+            }
+            const reason = result.reason || 'error';
+            log(`✗ ${resolvedProvider.name}: FAILED — ${reason}`);
+            if (result.reason === 'auth' && resolvedProvider.recoveryHint) {
+                log(`  ↳ fix: ${resolvedProvider.recoveryHint}`);
+            }
+
+            ctx.telemetry.providers_tried = [resolvedProvider.key];
+            ctx.telemetry.fallback_reasons = { [resolvedProvider.key]: { reason, error_details: result.error_details || null } };
+            ctx.telemetry.total_ms = Date.now() - provStart;
+
+            if (reason === 'auth') { ctx.recordTelemetry(2); process.exit(2); }
+            if (reason === 'quota' || reason === 'rate') { ctx.recordTelemetry(5); process.exit(5); }
+            if (reason === 'safety') { ctx.recordTelemetry(3); process.exit(3); }
+            if (reason === 'timeout') { ctx.recordTelemetry(10); process.exit(10); }
+            ctx.recordTelemetry(9);
+            process.exit(9);
         }
 
-        // Classify failure — reasons are now objects {reason, error_details}
-        const reasonValues = Object.values(result.reasons).map(r =>
-            typeof r === 'string' ? r : (r.reason || '')
-        );
-        const allAuth = reasonValues.every(r => r.includes('auth') || r.includes('AUTH'));
-        const allQuota = reasonValues.every(r => r.includes('quota') || r.includes('QUOTA') || r.includes('rate') || r.includes('RATE'));
-        // P0-6: was .some() — "1 safety + 7 other failures" would exit 3, contradicting
-        // the documented "Safety rejected by ALL providers" semantics. Now .every().
-        const allSafety = reasonValues.every(r => r.includes('safety') || r.includes('SAFETY'));
+        // Success
+        if (createdPage && page && !page.isClosed() && !keepTabs) {
+            try { await page.close(); } catch (_) { }
+        }
 
-        if (allAuth) {
-            log('All providers require authentication. Log into at least one service in Chrome.');
-            ctx.recordTelemetry(2);
-            process.exit(2);
-        }
-        if (allQuota) {
-            log('All providers are rate-limited. Wait and retry later.');
-            ctx.recordTelemetry(5);
-            process.exit(5);
-        }
-        if (allSafety) {
-            ctx.recordTelemetry(3);
-            process.exit(3);
-        }
-        // Exit 10 (ERR_TIMEOUT) was documented but never emitted — the chain
-        // stopping on total_timeout previously collapsed into exit 9.
-        const hasTotalTimeout = reasonValues.some(r => r.includes('total_timeout'));
-        if (hasTotalTimeout) {
-            log('Total timeout reached before the chain could complete.');
-            ctx.recordTelemetry(10);
-            process.exit(10);
-        }
-        ctx.recordTelemetry(9);
-        process.exit(9);
+        ctx.telemetry.provider_used = resolvedProvider.name;
+        ctx.telemetry.providers_tried = [resolvedProvider.key];
+        ctx.telemetry.total_ms = Date.now() - provStart;
+
+        log(`\n✓ ${resolvedProvider.name}: USED (${result.response.length} chars, ${ctx.telemetry.total_ms}ms total)`);
+        ctx.recordTelemetry(0);
+        process.stdout.write(result.response + '\n', () => process.exit(0));
+        setTimeout(() => process.exit(0), 5000).unref();
+        return;
 
     } catch (err) {
         log(`FATAL: ${err.message}`);

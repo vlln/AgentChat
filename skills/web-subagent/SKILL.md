@@ -1,9 +1,9 @@
 ---
 name: web-subagent
 description: >-
-  Send a prompt to a web AI and get the answer back. If the first provider is
-  unavailable, the next one answers automatically. A run is proven by its
-  `[receipt] AGENTCHAT_RUN` line on stderr — no receipt means no run happened.
+  Send a prompt to a web AI and get the answer back. One provider per invocation.
+  A run is proven by its `[receipt] AGENTCHAT_RUN` line on stderr — no receipt
+  means no run happened.
 license: MIT
 metadata:
   author: vlln
@@ -54,19 +54,18 @@ Claude, Qwen, Kimi, MiniMax, MiMo, DeepSeek, Doubao).
 ## Invocation
 
 ```bash
-node "$_S/scripts/index.js" "Your prompt"
-echo "Prompt from stdin" | node "$_S/scripts/index.js"
-node "$_S/scripts/index.js" --only=Kimi "prompt"         # pin one provider
-node "$_S/scripts/index.js" --timeout=600000 "long prompt..."
+node "$_S/scripts/index.js" --only=Kimi "Your prompt"
+echo "Prompt from stdin" | node "$_S/scripts/index.js" --only=Gemini
+node "$_S/scripts/index.js" --only=ChatGPT --timeout=600000 "long prompt..."
 node "$_S/scripts/index.js" --smoke      # reachability of all providers
 node "$_S/scripts/index.js" --doctor       # CDP only
 ```
 
 | Flag | Meaning |
 |------|---------|
-| `--timeout=N` | total budget ms (all provider attempts), default 600000 |
-| `--only=NAME` | exactly one provider, no fallback |
-| `--close` | close tabs/connection after run (default: keep) |
+| `--only=NAME` | which provider to use (required) |
+| `--timeout=N` | total budget ms, default 600000 |
+| `--close` | close tab after run (default: keep) |
 
 ## Exit codes
 
@@ -74,12 +73,12 @@ node "$_S/scripts/index.js" --doctor       # CDP only
 |------|---------|
 | 0 | success — response on stdout |
 | 1 | Chrome CDP unreachable |
-| 2 | all providers auth-gated (not logged in) |
-| 3 | safety filter rejected (tried all) |
+| 2 | provider auth-gated (not logged in) |
+| 3 | safety filter rejected |
 | 4 | internal error |
-| 5 | all providers rate-limited |
-| 9 | all providers exhausted, mixed reasons |
-| 10 | total timeout, no complete response |
+| 5 | provider rate-limited |
+| 9 | provider failed, other reason |
+| 10 | timeout |
 
 ## Output
 
@@ -104,10 +103,7 @@ node "$_S/scripts/index.js" --doctor       # CDP only
 
 ## When NOT to use
 
-- Interactive multi-turn conversations needing cross-call context (each provider
-  has independent session state per invocation).
-- Tasks where provider identity matters and automatic fallback is unwanted —
-  use `--only=NAME` to pin one.
+- Tasks where provider identity doesn't matter and any available AI would do — this bridge requires an explicit `--only=NAME` choice.
 
 For architecture, the adapter contract, layering, and how to add a provider,
 see `DESIGN.md` (developer-facing, not needed to use this skill).
