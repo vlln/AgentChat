@@ -54,16 +54,16 @@ Claude, Qwen, Kimi, MiniMax, MiMo, DeepSeek, Doubao).
 ## Invocation
 
 ```bash
-node "$_S/scripts/index.js" --only=Kimi "Your prompt"
-echo "Prompt from stdin" | node "$_S/scripts/index.js" --only=Gemini
-node "$_S/scripts/index.js" --only=ChatGPT --timeout=600000 "long prompt..."
+node "$_S/scripts/index.js" --backends=Kimi "Your prompt"
+echo "Prompt from stdin" | node "$_S/scripts/index.js" --backends=Gemini
+node "$_S/scripts/index.js" --backends=ChatGPT --timeout=600000 "long prompt..."
 node "$_S/scripts/index.js" --smoke      # reachability of all providers
 node "$_S/scripts/index.js" --doctor       # CDP only
 ```
 
 | Flag | Meaning |
 |------|---------|
-| `--only=NAME` | which provider to use (required) |
+| `--backends=NAME` | which provider to use (required) |
 | `--timeout=N` | total budget ms, default 600000 |
 | `--close` | close tab after run (default: keep) |
 
@@ -103,7 +103,7 @@ node "$_S/scripts/index.js" --doctor       # CDP only
 
 ## When NOT to use
 
-- Tasks where provider identity doesn't matter and any available AI would do — this bridge requires an explicit `--only=NAME` choice.
+- Tasks where provider identity doesn't matter and any available AI would do — this bridge requires an explicit `--backends=NAME` choice.
 
 For architecture, the adapter contract, layering, and how to add a provider,
 see `DESIGN.md` (developer-facing, not needed to use this skill).

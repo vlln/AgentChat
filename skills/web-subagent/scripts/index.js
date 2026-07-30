@@ -7,9 +7,9 @@
  * on failure.
  *
  * Usage:
- *   node index.js --only=Kimi "Your prompt here"
- *   node index.js --only=ChatGPT --timeout=600000 "Long prompt..."
- *   echo "Prompt from stdin" | node index.js --only=Gemini
+ *   node index.js --backends=Kimi "Your prompt here"
+ *   node index.js --backends=ChatGPT --timeout=600000 "Long prompt..."
+ *   echo "Prompt from stdin" | node index.js --backends=Gemini
  *   node index.js --smoke          # verify all providers reachable
  *   node index.js --doctor         # check CDP connectivity only
  *
@@ -254,8 +254,8 @@ async function main() {
         } else if (a === '--close' || a === '--close-browser') {
             // Only closes our own tab on success (page.close()) — never browser.close().
             keepTabs = false;
-        } else if (a.startsWith('--only=')) {
-            providerName = a.split('=')[1];
+        } else if (a.startsWith('--backends=')) {
+            providerName = a.split('=')[1].split(',')[0].trim();
         } else if (a.startsWith('--locale=')) {
             // FEATURE GAP FIX: --locale was documented (lib/locales/gemini.js
             // header: "CLI 传 --locale=xx_XX") and passed by the Python SDK
@@ -287,17 +287,17 @@ async function main() {
     }
     if (!prompt && !args.includes('--smoke')) {
         if (args.includes('--help') || args.includes('-h')) {
-            console.error('Usage: node index.js --only=NAME [--timeout=MS] [--close] [--locale=xx_XX] [--smoke] [--doctor] "Your prompt"');
-            console.error('       echo "prompt" | node index.js --only=NAME [flags]');
+            console.error('Usage: node index.js --backends=NAME [--timeout=MS] [--close] [--locale=xx_XX] [--smoke] [--doctor] "Your prompt"');
+            console.error('       echo "prompt" | node index.js --backends=NAME [flags]');
             process.exit(0);
         }
         if (!providerName) {
-            console.error('Missing --only=NAME. Specify which provider to use.');
-            console.error('Usage: node index.js --only=NAME [--timeout=MS] [--close] "Your prompt"');
+            console.error('Missing --backends=NAME. Specify which provider to use.');
+            console.error('Usage: node index.js --backends=NAME [--timeout=MS] [--close] "Your prompt"');
             process.exit(1);
         }
-        console.error('Usage: node index.js --only=NAME [--timeout=MS] [--close] [--locale=xx_XX] [--smoke] [--doctor] "Your prompt"');
-        console.error('       echo "prompt" | node index.js --only=NAME [flags]');
+        console.error('Usage: node index.js --backends=NAME [--timeout=MS] [--close] [--locale=xx_XX] [--smoke] [--doctor] "Your prompt"');
+        console.error('       echo "prompt" | node index.js --backends=NAME [flags]');
         process.exit(1);
     }
 

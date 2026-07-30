@@ -55,7 +55,7 @@ implements the interface.
 ## Layering
 
 ```
-web-subagent   the skill: single-provider bridge (--only=NAME)
+web-subagent   the skill: single-provider bridge (--backends=NAME)
         ↑ also the leaf executor (CLI: one provider per invocation)
 Kernel                  bridge/run.js (createProviderRunner) + bridge/{dom,completion,overlays,extract,contract}
         ↑ dispatches to
@@ -64,7 +64,7 @@ Adapters                providers/<name>.js — each owns its DOM coupling
 
 web-subagent is the skill AND the leaf executor. It connects to the shared
 Chrome and runs `createProviderRunner` per provider (`tryAllProviders`), or —
-under `--only=X --single` — runs exactly one provider and returns. There is
+under `--backends=X` — runs exactly one provider and returns. There is
 no separate orchestration layer above it: application-level composition
 (sequential pipelines, parallel DAG dispatch) is left to the caller. This
 keeps the repo to exactly one thing — the CDP bridge — with no dead
@@ -132,5 +132,5 @@ non-obvious differences, for maintenance reference:
 3. Add the key to `PROVIDER_KEYS` in `skills/web-subagent/scripts/index.js`
    (auto-registers a runner via `createProviderRunner`).
 4. Validate: `assertAdapter` fails fast at load if required fields are missing;
-   `npm test` covers shared patterns; `--only=<name> --single` exercises the
+   `npm test` covers shared patterns; `--backends=<name>` exercises the
    dispatch path against a live Chrome.
