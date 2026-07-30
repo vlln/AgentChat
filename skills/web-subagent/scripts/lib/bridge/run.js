@@ -59,7 +59,7 @@ DEFAULTS.input = defaultInput;
  * The returned function has the same signature as the legacy tryXxx() functions:
  *   async (page, prompt, timeoutMs, ctx) → { success, response? }
  *
- * This makes it a drop-in replacement in tryAllProviders' switch block.
+ * This makes it a drop-in replacement for the caller's error handling.
  *
  * @param {object} cfg — provider config (see CONFIG SCHEMA above)
  * @returns {(page: Page, prompt: string, timeoutMs: number, ctx: object) => Promise<{success: boolean, response?: string, reason?: string}>}
@@ -358,7 +358,7 @@ function createProviderRunner(cfg) {
         // ── Step 9: Extract + post-process ──
         // BUGFIX: previously not wrapped in try/catch, so a postResponseHook throw
         // (e.g. Gemini's ERR_SAFETY_REJECTED) bypassed classifyError entirely here
-        // and only got caught by the generic outer catch in tryAllProviders, which
+        // and only got caught by the generic outer catch in the caller, which
         // used to always collapse to reason='error' — losing the safety signal.
         let response;
         try {

@@ -27,7 +27,7 @@ const STAGES = Object.freeze({
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Valid fallback reason strings (used by the orchestrator to classify failures)
+// Valid failure reason strings
 // ══════════════════════════════════════════════════════════════════════════════
 
 const REASONS = Object.freeze({
@@ -79,7 +79,7 @@ class ProviderError extends Error {
     }
 
     /**
-     * Convert to the { success: false, ... } result shape expected by tryAllProviders.
+     * Convert to a { success: false, ... } result shape.
      *
      * Reason resolution order: explicit `reason` arg > CODE_TO_REASON[this.code] > 'error'.
      * This lets adapter hooks (e.g. Gemini's postResponseHook throwing with
@@ -114,7 +114,7 @@ class ProviderError extends Error {
  * @param {Error} err         — caught error
  * @param {string} stage       — pipeline stage (from STAGES)
  * @param {string} provider    — provider key
- * @param {string} [reason]    — fallback reason (default: 'error')
+ * @param {string} [reason] — failure reason (default: 'error')
  * @returns {{ success: false, reason, error_details }}
  */
 function classifyError(err, stage, provider, reason) {

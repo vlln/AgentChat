@@ -65,6 +65,7 @@ node "$_S/scripts/index.js" --doctor       # CDP only
 |------|---------|
 | `--backends=NAME` | which provider to use (required) |
 | `--timeout=N` | total budget ms, default 600000 |
+| `--locale=xx_XX` | force Gemini UI locale |
 | `--close` | close tab after run (default: keep) |
 
 ## Exit codes
@@ -83,9 +84,8 @@ node "$_S/scripts/index.js" --doctor       # CDP only
 ## Output
 
 - stdout: AI response text on success.
-- stderr: diagnostics, `[fallback]`-prefixed, plus the receipt line.
-- telemetry: `data/fallback-telemetry.jsonl` (provider_used, providers_tried,
-  fallback_reasons, prompt/response lengths, total_ms, exit_code).
+- stderr: diagnostics, `[agentchat]`-prefixed, plus the receipt line.
+- telemetry: `data/telemetry.jsonl` (provider_used, provider_key, prompt/response lengths, total_ms, exit_code).
 
 ## Gotchas
 

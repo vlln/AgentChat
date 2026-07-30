@@ -28,7 +28,7 @@ const { chromium } = require('playwright-core');
 const fs = require('fs');
 const path = require('path');
 
-const { ProviderError, classifyError } = require('./lib/errors');
+const { classifyError } = require('./lib/errors');
 const { createProviderRunner } = require('./lib/bridge/run');
 const { appendWithRotation } = require('./lib/telemetry');
 const { makeRunId, emitReceipt } = require('./lib/receipt');
@@ -36,7 +36,7 @@ const { log: _log, startTimer: _startTimer, spinner } = require('./lib/terminal'
 const { connectWithRetry: _connectWithRetry, doctorCheck: _doctorCheck } = require('./lib/cdp');
 
 // ── Adapt shared modules to WebExtended naming conventions ──
-const PREFIX = 'fallback';
+const PREFIX = 'agentchat';
 const log = (msg) => _log(PREFIX, msg);
 const startTimer = (label) => _startTimer(PREFIX, label);
 const connectWithRetry = (cdpUrl, retries) => _connectWithRetry(chromium, cdpUrl, retries, log);
@@ -47,8 +47,7 @@ const doctorCheck = () => _doctorCheck(true, log);
 // ══════════════════════════════════════════════════════════════════════════════
 
 const CDP_URL = `http://127.0.0.1:${process.env.CDP_PORT || '9222'}`;
-const DEFAULT_TOTAL_TIMEOUT = 600_000; // 10 min total across all providers
-const DEFAULT_PROVIDER_TIMEOUT = 180_000; // 3 min per provider
+const DEFAULT_TOTAL_TIMEOUT = 600_000; // 10 min
 const SKILL_DIR = path.join(path.dirname(__filename), '..'); // skill root (parent of scripts/) for telemetry
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -64,19 +63,17 @@ class InvocationContext {
             run_id: this.runId,
             timestamp: new Date().toISOString(),
             provider_used: null,
-            providers_tried: [],
-            fallback_reasons: {},
+            provider_key: null,
             prompt_length_chars: 0,
             response_length_chars: 0,
             total_ms: 0,
-            per_provider_ms: {},
             exit_code: 0,
         };
     }
 
     recordTelemetry(code) {
         this.telemetry.exit_code = code;
-        const f = path.join(SKILL_DIR, 'data', 'fallback-telemetry.jsonl');
+        const f = path.join(SKILL_DIR, 'data', 'telemetry.jsonl');
         appendWithRotation(f, JSON.stringify(this.telemetry) + '\n');
         // Execution receipt — single choke point covering every exit path
         // (success AND failure both prove "the skill ran"). STDERR on purpose:
@@ -99,7 +96,7 @@ class InvocationContext {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PROVIDER CHAIN (priority order — first available wins)
+// PROVIDER REGISTRY — known providers for --backends=NAME lookup and --smoke
 // ══════════════════════════════════════════════════════════════════════════════
 
 // Single source of truth: lib/providers/chain.js (also consumed by FreeSubAgent,
@@ -372,8 +369,7 @@ async function main() {
                 log(`  ↳ fix: ${resolvedProvider.recoveryHint}`);
             }
 
-            ctx.telemetry.providers_tried = [resolvedProvider.key];
-            ctx.telemetry.fallback_reasons = { [resolvedProvider.key]: { reason, error_details: result.error_details || null } };
+            ctx.telemetry.provider_key = resolvedProvider.key;
             ctx.telemetry.total_ms = Date.now() - provStart;
 
             if (reason === 'auth') { ctx.recordTelemetry(2); process.exit(2); }
@@ -390,7 +386,7 @@ async function main() {
         }
 
         ctx.telemetry.provider_used = resolvedProvider.name;
-        ctx.telemetry.providers_tried = [resolvedProvider.key];
+        ctx.telemetry.provider_key = resolvedProvider.key;
         ctx.telemetry.total_ms = Date.now() - provStart;
 
         log(`\n✓ ${resolvedProvider.name}: USED (${result.response.length} chars, ${ctx.telemetry.total_ms}ms total)`);
@@ -411,9 +407,7 @@ async function main() {
 
 if (require.main === module) {
     main().catch(e => {
-        process.stderr.write(`[fallback] unhandled: ${e.message}\n`);
+        process.stderr.write(`[agentchat] unhandled: ${e.message}\n`);
         process.exit(4);
     });
 }
-
-module.exports = { PROVIDER_CHAIN };

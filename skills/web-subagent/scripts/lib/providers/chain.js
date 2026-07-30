@@ -1,5 +1,5 @@
 /**
- * PROVIDER_CHAIN — provider priority order.
+ * PROVIDER_CHAIN — known providers for --backends lookup and --smoke.
  *
  * Metadata (name, recoveryHint, tabHosts) lives here. url and authDomains
  * are sourced from each adapter config — no duplication, no drift.

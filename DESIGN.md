@@ -63,8 +63,7 @@ Adapters                providers/<name>.js — each owns its DOM coupling
 ```
 
 web-subagent is the skill AND the leaf executor. It connects to the shared
-Chrome and runs `createProviderRunner` per provider (`tryAllProviders`), or —
-under `--backends=X` — runs exactly one provider and returns. There is
+Chrome and runs `createProviderRunner` for the specified provider. There is
 no separate orchestration layer above it: application-level composition
 (sequential pipelines, parallel DAG dispatch) is left to the caller. This
 keeps the repo to exactly one thing — the CDP bridge — with no dead
