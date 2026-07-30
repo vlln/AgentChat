@@ -1,11 +1,9 @@
 ---
 name: web-subagent
 description: >-
-  Multi-provider CDP bridge with automatic fallback
-  (Gemini→ChatGPT→Claude→Qwen→Kimi→MiniMax→MiMo→DeepSeek→Doubao). Use for AI
-  provider failover, fallback chain, multi-provider routing, or "send to any
-  available AI". A run is proven by its `[receipt] AGENTCHAT_RUN` line on stderr
-  — no receipt means no run happened.
+  Send a prompt to a web AI and get the answer back. If the first provider is
+  unavailable, the next one answers automatically. A run is proven by its
+  `[receipt] AGENTCHAT_RUN` line on stderr — no receipt means no run happened.
 license: MIT
 metadata:
   author: vlln
@@ -16,11 +14,6 @@ requires:
 ---
 
 # web-subagent — Multi-Provider CDP Bridge
-
-Priority chain: Gemini (Pro Extended) → ChatGPT → Claude → Qwen → Kimi →
-MiniMax → MiMo → DeepSeek → Doubao. First available provider wins; each step
-falls through only on confirmed unavailability (quota/auth/model-degraded),
-never on transient network errors.
 
 `$_S` denotes this skill's own directory. Set it before running:
 ```bash
@@ -91,19 +84,6 @@ node "$_S/scripts/index.js" --doctor       # CDP only
 | 5 | all providers rate-limited |
 | 9 | all providers exhausted, mixed reasons |
 | 10 | total timeout, no complete response |
-
-## Fallback chain
-
-```
-Gemini → ChatGPT → Claude → Qwen → Kimi → MiniMax → MiMo → DeepSeek → Doubao
-(Pro Extended)                                                                (last resort)
-```
-
-Each provider passes a 3-layer check before sending: reachability (page
-loads / not auth-gated), usability (editor editable / not quota-hit), model
-quality (Gemini-only: Pro Extended → Flash → degraded). Degradation triggers
-live in each adapter's `quotaPatterns` — that file is the source of truth;
-this doc keeps no second copy.
 
 ## Output
 
