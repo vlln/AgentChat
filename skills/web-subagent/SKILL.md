@@ -56,8 +56,7 @@ Claude, Qwen, Kimi, MiniMax, MiMo, DeepSeek, Doubao).
 ```bash
 node "$_S/scripts/index.js" "Your prompt"
 echo "Prompt from stdin" | node "$_S/scripts/index.js"
-node "$_S/scripts/index.js" --from=ChatGPT "prompt"     # start from a provider
-node "$_S/scripts/index.js" --only=Kimi "prompt"         # exactly one, no cascade
+node "$_S/scripts/index.js" --only=Kimi "prompt"         # pin one provider
 node "$_S/scripts/index.js" --timeout=600000 "long prompt..."
 node "$_S/scripts/index.js" --smoke      # reachability of all providers
 node "$_S/scripts/index.js" --doctor       # CDP only
@@ -66,11 +65,8 @@ node "$_S/scripts/index.js" --doctor       # CDP only
 | Flag | Meaning |
 |------|---------|
 | `--timeout=N` | total budget ms (all provider attempts), default 600000 |
-| `--timeout-per-provider=N` | per-provider ceiling ms, default `timeout/2` or 180000 |
-| `--from=NAME` | start from NAME, skip earlier chain entries (case-insensitive, abbreviation ok) |
-| `--single` | try only the `--from` provider, no cascade; pins one provider |
-| `--only=NAME` | `--from=NAME --single` combined; unknown NAME fails loudly |
-| `--close` / `--close-browser` | close tabs/connection after run (default: keep) |
+| `--only=NAME` | exactly one provider, no fallback |
+| `--close` | close tabs/connection after run (default: keep) |
 
 ## Exit codes
 
